@@ -1,0 +1,19 @@
+.env
+.tmp/
+.DS_Store
+credentials.json
+token.json
+__pycache__/
+*.pyc
+
+# Archivos grandes de assets — no van al repo
+1. Brand Guidelines Compressed.pdf
+Fotos Relojes/
+Fotos Vassar/
+Imágenes IA/
+Carruseles/
+Historias/
+Referencias/
+LOGO/
+MOTIF/
+TIPOGRAFÍA/

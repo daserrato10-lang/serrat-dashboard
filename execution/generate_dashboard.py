@@ -1,0 +1,1081 @@
+#!/usr/bin/env python3
+"""
+Serrat Relojes — Instagram Dashboard Generator
+1. Toma un snapshot diario de métricas por post
+2. Acumula historia en .tmp/post_snapshots.json
+3. Genera dashboard HTML con gráficas interactivas
+"""
+
+import os, json, time, sys
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+import urllib.request, urllib.parse
+
+# ── Config ────────────────────────────────────────────────────
+
+ROOT      = Path(__file__).parent.parent
+ENV       = ROOT / ".env"
+OUT       = ROOT / ".tmp" / "dashboard.html"
+SNAPSHOTS = ROOT / ".tmp" / "post_snapshots.json"
+TAGS_FILE = ROOT / "post_tags.json"
+
+def load_env():
+    env = {}
+    if ENV.exists():
+        for line in ENV.read_text().splitlines():
+            if "=" in line and not line.startswith("#"):
+                k, v = line.split("=", 1)
+                env[k.strip()] = v.strip()
+    return env
+
+cfg   = load_env()
+TOKEN = cfg.get("IG_TOKEN", os.environ.get("IG_TOKEN", ""))
+IG_ID = cfg.get("IG_ID",    os.environ.get("IG_ID", ""))
+BASE  = "https://graph.facebook.com/v21.0"
+
+# ── API ───────────────────────────────────────────────────────
+
+def ig_get(path, params=None):
+    params = params or {}
+    params["access_token"] = TOKEN
+    qs  = urllib.parse.urlencode(params)
+    url = f"{BASE}/{path}?{qs}"
+    with urllib.request.urlopen(url, timeout=15) as r:
+        data = json.loads(r.read())
+    if "error" in data:
+        raise RuntimeError(data["error"]["message"])
+    return data
+
+def get_perfil():
+    return ig_get(IG_ID, {"fields": "username,followers_count,follows_count,media_count,website"})
+
+def get_insights_28d():
+    since = int((datetime.now(timezone.utc) - timedelta(days=28)).timestamp())
+    until = int(datetime.now(timezone.utc).timestamp())
+    daily  = ig_get(f"{IG_ID}/insights", {
+        "metric": "reach,follower_count", "period": "day",
+        "since": since, "until": until
+    })
+    totals = ig_get(f"{IG_ID}/insights", {
+        "metric": "profile_views,website_clicks,total_interactions,likes,comments,shares,saves",
+        "metric_type": "total_value", "period": "day",
+        "since": since, "until": until
+    })
+    result = {}
+    for m in daily.get("data", []):
+        vals = m.get("values", [])
+        result[m["name"]] = sum(v["value"] for v in vals if isinstance(v.get("value"), (int, float)))
+        if m["name"] == "reach":
+            result["reach_daily"] = [{"date": v["end_time"][:10], "value": v["value"]} for v in vals]
+    for m in totals.get("data", []):
+        result[m["name"]] = (m.get("total_value") or {}).get("value", 0)
+    return result
+
+def get_posts(limit=30):
+    media = ig_get(f"{IG_ID}/media", {
+        "fields": "id,caption,media_type,timestamp,like_count,comments_count,permalink",
+        "limit": limit
+    })
+    posts = media.get("data", [])
+    for post in posts:
+        try:
+            ins = ig_get(f"{post['id']}/insights", {"metric": "reach,saved,shares"})
+            for m in ins.get("data", []):
+                post[f"metric_{m['name']}"] = (m.get("values") or [{}])[0].get("value", 0)
+        except Exception:
+            post["metric_reach"] = post["metric_saved"] = post["metric_shares"] = 0
+        time.sleep(0.1)
+    return posts
+
+def get_demografia():
+    def fetch(breakdown):
+        try:
+            return ig_get(f"{IG_ID}/insights", {
+                "metric": "follower_demographics", "metric_type": "total_value",
+                "period": "lifetime", "breakdown": breakdown
+            })
+        except Exception:
+            return None
+    return {"age_gender": fetch("age,gender"), "country": fetch("country"), "city": fetch("city")}
+
+def parse_breakdowns(data):
+    try:
+        return data["data"][0]["total_value"]["breakdowns"][0]["results"]
+    except Exception:
+        return []
+
+# ── Snapshots ─────────────────────────────────────────────────
+
+def parse_ig_timestamp(ts):
+    """Convierte timestamp de Instagram (ISO 8601) a datetime UTC."""
+    if not ts:
+        return None
+    # Formato: 2026-07-01T20:15:00+0000
+    ts = ts.replace("+0000", "+00:00")
+    try:
+        return datetime.fromisoformat(ts).astimezone(timezone.utc)
+    except Exception:
+        return None
+
+def save_snapshot(posts):
+    """Guarda un snapshot con timestamp exacto por post."""
+    colombia       = timezone(timedelta(hours=-5))
+    now_col        = datetime.now(colombia)
+    today          = now_col.strftime("%Y-%m-%d")
+    snapshot_taken = datetime.now(timezone.utc).isoformat()  # hora exacta en UTC para cálculo de horas
+
+    if SNAPSHOTS.exists():
+        history = json.loads(SNAPSHOTS.read_text())
+    else:
+        history = {}
+
+    if today in history:
+        print(f"  ℹ️  Snapshot de {today} ya existe — se omite duplicado.")
+        return history
+
+    history[today] = {
+        "_meta": {"taken_at": snapshot_taken},
+    }
+    for post in posts:
+        pid = post["id"]
+        history[today][pid] = {
+            "published":    post.get("timestamp", "")[:10],
+            "published_at": post.get("timestamp", ""),   # hora exacta
+            "caption":      (post.get("caption") or "")[:120].replace("\n", " "),
+            "type":         post.get("media_type", ""),
+            "permalink":    post.get("permalink", ""),
+            "likes":        post.get("like_count", 0),
+            "comments":     post.get("comments_count", 0),
+            "reach":        post.get("metric_reach", 0),
+            "saved":        post.get("metric_saved", 0),
+            "shares":       post.get("metric_shares", 0),
+        }
+
+    SNAPSHOTS.write_text(json.dumps(history, ensure_ascii=False, indent=2))
+    print(f"  ✅ Snapshot guardado: {today} a las {snapshot_taken[11:16]} UTC ({len(posts)} posts)")
+    return history
+
+def hours_between(pub_at_str, snap_taken_str):
+    """Horas exactas entre publicación y momento del snapshot."""
+    pub  = parse_ig_timestamp(pub_at_str)
+    snap = parse_ig_timestamp(snap_taken_str)
+    if pub and snap:
+        return round((snap - pub).total_seconds() / 3600, 1)
+    return None
+
+def build_series_entry(date_str, snap_taken_at, data):
+    """Construye un punto de serie con horas exactas."""
+    hours = hours_between(data.get("published_at", ""), snap_taken_at)
+    # Fallback a días*24 si no hay timestamp exacto (snapshots viejos)
+    if hours is None:
+        try:
+            pub_date  = datetime.strptime(data.get("published", ""), "%Y-%m-%d").date()
+            snap_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            hours     = (snap_date - pub_date).days * 24
+        except Exception:
+            hours = 0
+    return {
+        "snapshot_date": date_str,
+        "hours":         hours,
+        "reach":         data.get("reach", 0),
+        "likes":         data.get("likes", 0),
+        "comments":      data.get("comments", 0),
+        "saved":         data.get("saved", 0),
+        "shares":        data.get("shares", 0),
+    }
+
+def build_growth_data(history):
+    """
+    Solo posts publicados DESPUÉS del primer snapshot.
+    Serie en horas exactas desde publicación.
+    """
+    first_snapshot_date = min(k for k in history.keys() if not k.startswith("_")) if history else "9999-12-31"
+
+    all_posts = {}
+    for date_str, snap in history.items():
+        if date_str.startswith("_"):
+            continue
+        for pid, data in snap.items():
+            if pid == "_meta":
+                continue
+            if data.get("published", "") < first_snapshot_date:
+                continue
+            if pid not in all_posts:
+                all_posts[pid] = {
+                    "id":           pid,
+                    "caption":      data["caption"],
+                    "type":         data["type"],
+                    "permalink":    data["permalink"],
+                    "published":    data["published"],
+                    "published_at": data.get("published_at", ""),
+                    "series":       []
+                }
+
+    for date_str in sorted(history.keys()):
+        if date_str.startswith("_"):
+            continue
+        snap         = history[date_str]
+        snap_taken   = (snap.get("_meta") or {}).get("taken_at", date_str + "T18:00:00+00:00")
+        for pid, data in snap.items():
+            if pid == "_meta" or pid not in all_posts:
+                continue
+            all_posts[pid]["series"].append(build_series_entry(date_str, snap_taken, data))
+
+    result = [p for p in all_posts.values() if p["series"]]
+    result.sort(key=lambda x: x["published_at"] or x["published"], reverse=True)
+    return result
+
+def build_growth_data_all(history):
+    """Todos los posts sin filtro de fecha — para el modal."""
+    all_posts = {}
+    for date_str, snap in history.items():
+        if date_str.startswith("_"):
+            continue
+        for pid, data in snap.items():
+            if pid == "_meta":
+                continue
+            if pid not in all_posts:
+                all_posts[pid] = {
+                    "id":           pid,
+                    "caption":      data["caption"],
+                    "type":         data["type"],
+                    "permalink":    data["permalink"],
+                    "published":    data["published"],
+                    "published_at": data.get("published_at", ""),
+                    "series":       []
+                }
+
+    for date_str in sorted(history.keys()):
+        if date_str.startswith("_"):
+            continue
+        snap       = history[date_str]
+        snap_taken = (snap.get("_meta") or {}).get("taken_at", date_str + "T18:00:00+00:00")
+        for pid, data in snap.items():
+            if pid == "_meta" or pid not in all_posts:
+                continue
+            all_posts[pid]["series"].append(build_series_entry(date_str, snap_taken, data))
+
+    result = [p for p in all_posts.values() if p["series"]]
+    result.sort(key=lambda x: x["published_at"] or x["published"], reverse=True)
+    return result
+
+# ── Tags ─────────────────────────────────────────────────────
+
+CATEGORIES = ["evento", "producto", "lifestyle", "comunidad", "sin etiquetar"]
+
+def load_tags():
+    if TAGS_FILE.exists():
+        return json.loads(TAGS_FILE.read_text())
+    return {}
+
+def save_tags_file(tags):
+    TAGS_FILE.write_text(json.dumps(tags, ensure_ascii=False, indent=2))
+
+# ── HTML ──────────────────────────────────────────────────────
+
+COLORS = [
+    "#5c6bc0","#43a047","#fb8c00","#e91e63","#00897b",
+    "#8e24aa","#1e88e5","#f4511e","#39ac73","#c0ca33"
+]
+TAG_COLORS = {
+    "evento":        "#e91e63",
+    "producto":      "#1e88e5",
+    "lifestyle":     "#43a047",
+    "comunidad":     "#fb8c00",
+    "sin etiquetar": "#555577",
+}
+
+def build_html(perfil, insights, posts, demo, history):
+    updated   = datetime.now().strftime("%d %b %Y, %I:%M %p")
+    followers = perfil.get("followers_count", 0)
+    reach     = insights.get("reach", 0)
+    pviews    = insights.get("profile_views", 0)
+    wclicks   = insights.get("website_clicks", 0)
+    fgained   = insights.get("follower_count", 0)
+    inter     = insights.get("total_interactions", 0)
+    likes     = insights.get("likes", 0)
+    comments  = insights.get("comments", 0)
+    shares    = insights.get("shares", 0)
+    saves     = insights.get("saves", 0)
+
+    tags = load_tags()
+    eng_rate  = round(inter / followers * 100, 2) if followers else 0
+
+    reach_labels = json.dumps([d["date"] for d in insights.get("reach_daily", [])])
+    reach_values = json.dumps([d["value"] for d in insights.get("reach_daily", [])])
+
+    # Growth data — ranking (solo posts desde primer snapshot) y modal (todos)
+    growth_posts   = build_growth_data(history)
+    all_posts_data = build_growth_data_all(history)
+
+    # Agregar tag y vida útil a cada post
+    for p in growth_posts:
+        p["tag"] = tags.get(p["id"], "sin etiquetar")
+        last = p["series"][-1] if p["series"] else {}
+        hours = last.get("hours") or 0
+        p["vida_util"] = round(last.get("reach", 0) / hours, 2) if hours > 0 else 0
+        # Curva de vida útil por snapshot
+        p["vu_series"] = [
+            {"hours": s.get("hours", 0),
+             "vu": round(s.get("reach", 0) / s.get("hours", 1), 2) if s.get("hours", 0) > 0 else 0}
+            for s in p["series"]
+        ]
+
+    for p in all_posts_data:
+        p["tag"] = tags.get(p["id"], "sin etiquetar")
+        last = p["series"][-1] if p["series"] else {}
+        hours = last.get("hours") or 0
+        p["vida_util"] = round(last.get("reach", 0) / hours, 2) if hours > 0 else 0
+        p["vu_series"] = [
+            {"hours": s.get("hours", 0),
+             "vu": round(s.get("reach", 0) / s.get("hours", 1), 2) if s.get("hours", 0) > 0 else 0}
+            for s in p["series"]
+        ]
+
+    growth_json    = json.dumps(growth_posts, ensure_ascii=False)
+    all_posts_json = json.dumps(all_posts_data, ensure_ascii=False)
+    colors_json    = json.dumps(COLORS)
+    categories_json = json.dumps(CATEGORIES)
+    tag_colors_json = json.dumps(TAG_COLORS)
+
+    # Número de snapshots
+    num_snapshots = len(history)
+    first_snapshot = min(history.keys()) if history else "—"
+
+    # Posts table
+    posts_rows = ""
+    for p in posts:
+        caption  = (p.get("caption") or "").replace("\n", " ")[:120]
+        kind_icon = {"IMAGE": "🖼️", "VIDEO": "🎥", "CAROUSEL_ALBUM": "🎞️"}.get(p.get("media_type",""), "📄")
+        r = p.get("metric_reach", 0)
+        eng = round((p.get("like_count",0) + p.get("comments_count",0)) / r * 100, 1) if r else 0
+        pub = p.get("timestamp","")[:10]
+        pid = p.get("id","")
+        post_tag = tags.get(pid, "sin etiquetar")
+        tag_color = TAG_COLORS.get(post_tag, "#555577")
+        try:
+            days_old = (datetime.now().date() - datetime.strptime(pub, "%Y-%m-%d").date()).days
+        except Exception:
+            days_old = "?"
+        cat_options = "".join(
+            f'<option value="{c}" {"selected" if c==post_tag else ""}>{c}</option>'
+            for c in CATEGORIES
+        )
+        posts_rows += f"""
+        <tr class="clickable" data-pid="{pid}" onclick="openModal(this.dataset.pid)">
+          <td>{pub}<br><small style="color:#666">{days_old}d</small></td>
+          <td class="caption">{caption}</td>
+          <td class="center">{kind_icon}</td>
+          <td class="center">
+            <select class="tag-select" data-pid="{pid}" style="border-color:{tag_color};color:{tag_color}"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              {cat_options}
+            </select>
+          </td>
+          <td class="num">{p.get("like_count",0):,}</td>
+          <td class="num">{p.get("comments_count",0):,}</td>
+          <td class="num">{r:,}</td>
+          <td class="num">{p.get("metric_saved",0):,}</td>
+          <td class="num">{p.get("metric_shares",0):,}</td>
+          <td class="num">{eng}%</td>
+          <td class="center"><a href="{p.get("permalink","")}" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>"""
+
+    # Demographics
+    age_rows = ""
+    for r in sorted(parse_breakdowns(demo.get("age_gender")), key=lambda x: -x["value"])[:12]:
+        label = " / ".join(r.get("dimension_values", []))
+        age_rows += f'<tr><td>{label}</td><td class="num">{r["value"]:,}</td></tr>'
+
+    country_rows = ""
+    for r in sorted(parse_breakdowns(demo.get("country")), key=lambda x: -x["value"])[:10]:
+        label = r.get("dimension_values", [""])[0]
+        country_rows += f'<tr><td>{label}</td><td class="num">{r["value"]:,}</td></tr>'
+
+    city_rows = ""
+    for r in sorted(parse_breakdowns(demo.get("city")), key=lambda x: -x["value"])[:10]:
+        label = r.get("dimension_values", [""])[0]
+        city_rows += f'<tr><td>{label}</td><td class="num">{r["value"]:,}</td></tr>'
+
+    return f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Serrat Relojes — Dashboard Instagram</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0f0f1a;color:#e0e0f0;min-height:100vh}}
+  .top-bar{{background:#1a1a2e;padding:18px 32px;display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #2d2d55}}
+  .top-bar h1{{font-size:1.3rem;font-weight:700;color:#fff}}
+  .top-bar .updated{{font-size:0.75rem;color:#8888aa}}
+  .content{{max-width:1300px;margin:0 auto;padding:24px}}
+  h2{{font-size:.85rem;font-weight:600;color:#9090cc;text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;margin-top:28px}}
+  .kpi-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px}}
+  .kpi{{background:#1a1a2e;border-radius:10px;padding:18px;border:1px solid #2a2a44;position:relative;overflow:hidden}}
+  .kpi::before{{content:"";position:absolute;top:0;left:0;width:4px;height:100%;background:var(--accent,#5c6bc0)}}
+  .kpi .label{{font-size:.7rem;color:#8888aa;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}}
+  .kpi .value{{font-size:1.8rem;font-weight:700;color:#fff;line-height:1}}
+  .kpi .sub{{font-size:.68rem;color:#6666aa;margin-top:4px}}
+  .kpi.green{{--accent:#43a047}}.kpi.blue{{--accent:#1e88e5}}.kpi.purple{{--accent:#8e24aa}}
+  .kpi.orange{{--accent:#fb8c00}}.kpi.teal{{--accent:#00897b}}.kpi.pink{{--accent:#e91e63}}
+  .card{{background:#1a1a2e;border-radius:10px;padding:22px;border:1px solid #2a2a44;margin-top:20px}}
+  .table-wrap{{overflow-x:auto;margin-top:14px;border-radius:10px;border:1px solid #2a2a44}}
+  table{{width:100%;border-collapse:collapse;font-size:.8rem}}
+  thead tr{{background:#16213e}}
+  thead th{{padding:10px 12px;text-align:left;color:#9090cc;font-weight:600;white-space:nowrap;font-size:.72rem;text-transform:uppercase;letter-spacing:.5px}}
+  tbody tr{{border-top:1px solid #1e1e38;transition:background .15s}}
+  tbody tr:hover{{background:#1e1e38}}
+  tbody td{{padding:9px 12px;color:#cccce0;vertical-align:middle}}
+  .caption{{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+  .num{{text-align:right;font-variant-numeric:tabular-nums}}
+  .center{{text-align:center}}
+  a{{color:#7986cb;text-decoration:none}}
+  a:hover{{color:#aab4ff}}
+  .demo-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}}
+  .demo-box{{background:#1a1a2e;border-radius:10px;padding:18px;border:1px solid #2a2a44}}
+  .demo-box h3{{font-size:.75rem;color:#9090cc;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}}
+
+  /* Controls */
+  .controls{{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center}}
+  .ctrl-label{{font-size:.72rem;color:#8888aa;text-transform:uppercase;letter-spacing:.5px;margin-right:2px}}
+  .btn-group{{display:flex;gap:6px;flex-wrap:wrap}}
+  .btn{{padding:5px 14px;border-radius:20px;border:1px solid #3a3a5c;background:transparent;
+        color:#9090cc;cursor:pointer;font-size:.75rem;transition:all .15s}}
+  .btn:hover{{background:#2a2a44;color:#fff}}
+  .btn.active{{background:#5c6bc0;border-color:#5c6bc0;color:#fff;font-weight:600}}
+  .snapshot-info{{font-size:.72rem;color:#555588;margin-left:auto}}
+  /* Modal */
+  .modal-overlay{{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;
+                  display:flex;align-items:center;justify-content:center;padding:20px;
+                  opacity:0;pointer-events:none;transition:opacity .2s}}
+  .modal-overlay.open{{opacity:1;pointer-events:all}}
+  .modal{{background:#1a1a2e;border:1px solid #3a3a5c;border-radius:14px;
+          width:100%;max-width:820px;max-height:90vh;overflow-y:auto;padding:28px;
+          transform:translateY(16px);transition:transform .2s}}
+  .modal-overlay.open .modal{{transform:translateY(0)}}
+  .modal-header{{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}}
+  .modal-title{{font-size:1rem;font-weight:700;color:#fff;max-width:88%;line-height:1.4}}
+  .modal-meta{{font-size:.75rem;color:#8888aa;margin-bottom:18px}}
+  .modal-close{{background:none;border:none;color:#666;cursor:pointer;font-size:1.4rem;
+                line-height:1;padding:0;margin-left:8px;flex-shrink:0}}
+  .modal-close:hover{{color:#fff}}
+  .modal-metric-btns{{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px}}
+  .modal-stats{{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:20px}}
+  .modal-stat{{background:#13132a;border-radius:8px;padding:12px;text-align:center}}
+  .modal-stat .s-label{{font-size:.65rem;color:#8888aa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}}
+  .modal-stat .s-value{{font-size:1.3rem;font-weight:700;color:#fff}}
+  tbody tr.clickable{{cursor:pointer}}
+  tbody tr.clickable:hover td{{background:#222240}}
+  .tag-select{{background:#13132a;border:1px solid #3a3a5c;border-radius:12px;
+              padding:3px 8px;font-size:.7rem;cursor:pointer;outline:none;
+              transition:border-color .15s;max-width:120px}}
+  .tag-select:hover{{background:#1e1e38}}
+  .insight-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:4px}}
+  .insight-box{{background:#13132a;border-radius:10px;padding:18px;border:1px solid #2a2a44}}
+  .insight-box h3{{font-size:.72rem;color:#9090cc;text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}}
+  .insight-row{{display:flex;align-items:center;gap:10px;margin-bottom:10px}}
+  .insight-label{{font-size:.75rem;color:#cccce0;min-width:90px}}
+  .insight-bar-wrap{{flex:1;background:#1e1e38;border-radius:4px;height:8px;overflow:hidden}}
+  .insight-bar{{height:100%;border-radius:4px;transition:width .4s}}
+  .insight-val{{font-size:.75rem;color:#fff;font-weight:600;min-width:52px;text-align:right}}
+  .insight-note{{font-size:.65rem;color:#444466;margin-top:6px;text-align:center}}
+  .save-tags-btn{{background:#5c6bc0;border:none;color:#fff;padding:6px 16px;border-radius:20px;
+                  cursor:pointer;font-size:.75rem;display:none;margin-left:auto}}
+  .save-tags-btn:hover{{background:#7986cb}}
+  .save-tags-wrap{{display:flex;align-items:center;gap:10px;margin-bottom:8px}}
+  .save-tags-note{{font-size:.68rem;color:#444466;display:none}}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <h1>⌚ Serrat Relojes — Dashboard Instagram</h1>
+  <span class="updated">Actualizado: {updated}</span>
+</div>
+
+<div class="content">
+
+  <h2>Cuenta</h2>
+  <div class="kpi-grid">
+    <div class="kpi green"><div class="label">Seguidores</div><div class="value">{followers:,}</div></div>
+    <div class="kpi blue"><div class="label">Alcance total (28d)</div><div class="value">{reach:,}</div></div>
+    <div class="kpi purple"><div class="label">Visitas de perfil (28d)</div><div class="value">{pviews:,}</div></div>
+    <div class="kpi orange"><div class="label">Clics al sitio web (28d)</div><div class="value">{wclicks:,}</div></div>
+    <div class="kpi teal"><div class="label">Seguidores ganados (28d)</div><div class="value">{fgained:,}</div></div>
+    <div class="kpi pink"><div class="label">Tasa de engagement</div><div class="value">{eng_rate}%</div><div class="sub">interacciones / seguidores</div></div>
+  </div>
+
+  <h2>Interacciones (28 días)</h2>
+  <div class="kpi-grid">
+    <div class="kpi blue"><div class="label">Total interacciones</div><div class="value">{inter:,}</div></div>
+    <div class="kpi pink"><div class="label">Likes</div><div class="value">{likes:,}</div></div>
+    <div class="kpi purple"><div class="label">Comentarios</div><div class="value">{comments:,}</div></div>
+    <div class="kpi teal"><div class="label">Compartidos</div><div class="value">{shares:,}</div></div>
+    <div class="kpi orange"><div class="label">Guardados</div><div class="value">{saves:,}</div></div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Alcance diario (28d)</h2>
+    <canvas id="reachChart" style="max-height:200px"></canvas>
+  </div>
+
+  <!-- RANKING POR VIDA ÚTIL -->
+  <div class="card">
+    <h2 style="margin-top:0">Ranking — vida útil <small style="font-size:.65rem;color:#555588;font-weight:400;text-transform:none;letter-spacing:0">(reach / hora desde publicación)</small></h2>
+    <div class="controls">
+      <span class="ctrl-label">Ordenar por:</span>
+      <div class="btn-group" id="metricBtns">
+        <button class="btn active" data-metric="vida_util">Vida útil</button>
+        <button class="btn" data-metric="reach">Alcance total</button>
+        <button class="btn" data-metric="likes">Likes</button>
+        <button class="btn" data-metric="saved">Guardados</button>
+      </div>
+      <span class="snapshot-info">📸 {num_snapshots} snapshots · desde {first_snapshot}</span>
+    </div>
+    <p id="noDataMsg" style="color:#555588;font-size:.8rem;text-align:center;padding:30px 0;display:none">
+      Aún no hay posts rastreados desde {first_snapshot}. 📅
+    </p>
+    <canvas id="rankingChart" style="max-height:380px"></canvas>
+  </div>
+
+  <!-- INSIGHTS POR TIPO -->
+  <h2>Insights por tipo de contenido</h2>
+  <div class="insight-grid">
+    <div class="insight-box">
+      <h3>Vida útil promedio por formato</h3>
+      <div id="insightFormat"><p style="color:#444466;font-size:.75rem">Cargando…</p></div>
+      <p class="insight-note">reach/hora · calculado con snapshots disponibles</p>
+    </div>
+    <div class="insight-box">
+      <h3>Vida útil promedio por tipo de contenido</h3>
+      <div id="insightTag"><p style="color:#444466;font-size:.75rem">Cargando…</p></div>
+      <p class="insight-note">etiqueta los posts en la tabla para ver este análisis</p>
+    </div>
+    <div class="insight-box">
+      <h3>Hora de publicación vs vida útil</h3>
+      <div id="insightHour"><p style="color:#444466;font-size:.75rem">Cargando…</p></div>
+      <p class="insight-note">mañana (&lt;12h) · tarde (12-18h) · noche (&gt;18h) hora Colombia</p>
+    </div>
+  </div>
+
+  <h2>Últimos 30 posts <small style="color:#555588;font-size:.7rem;font-weight:400">— haz clic en cualquier fila para ver su historial · cambia el tipo de contenido con el selector</small></h2>
+  <div class="save-tags-wrap">
+    <span class="save-tags-note" id="tagsNote">Cambios sin guardar — cierra y vuelve a abrir el dashboard para que los insights se actualicen</span>
+    <button class="save-tags-btn" id="saveTagsBtn" onclick="exportTags()">💾 Guardar etiquetas</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Fecha</th><th>Caption</th><th>Formato</th><th>Tipo contenido</th>
+          <th class="num">Likes</th><th class="num">Coments</th>
+          <th class="num">Alcance</th><th class="num">Guardados</th>
+          <th class="num">Compartidos</th><th class="num">Eng%</th><th>Link</th>
+        </tr>
+      </thead>
+      <tbody>{posts_rows}</tbody>
+    </table>
+  </div>
+
+<!-- Modal detalle de post -->
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle"></div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-meta" id="modalMeta"></div>
+    <div class="modal-stats" id="modalStats"></div>
+    <div class="modal-metric-btns" id="modalMetricBtns">
+      <span style="font-size:.7rem;color:#8888aa;align-self:center;margin-right:4px">VER:</span>
+      <button class="btn active" data-m="vida_util">Vida útil</button>
+      <button class="btn" data-m="reach">Alcance</button>
+      <button class="btn" data-m="likes">Likes</button>
+      <button class="btn" data-m="saved">Guardados</button>
+    </div>
+    <canvas id="modalChart" style="max-height:280px"></canvas>
+    <p id="modalNoData" style="color:#555588;font-size:.8rem;text-align:center;padding:30px 0;display:none">
+      Aún no hay suficientes snapshots para mostrar la curva de este post. Vuelve mañana. 📅
+    </p>
+  </div>
+</div>
+
+  <h2>Audiencia</h2>
+  <div class="demo-grid">
+    <div class="demo-box">
+      <h3>Edad y género</h3>
+      <div class="table-wrap" style="border:none">
+        <table><tbody>{age_rows}</tbody></table>
+      </div>
+    </div>
+    <div class="demo-box">
+      <h3>Top países</h3>
+      <div class="table-wrap" style="border:none">
+        <table><tbody>{country_rows}</tbody></table>
+      </div>
+    </div>
+    <div class="demo-box">
+      <h3>Top ciudades</h3>
+      <div class="table-wrap" style="border:none">
+        <table><tbody>{city_rows}</tbody></table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── Alcance diario ───────────────────────────────────────────
+new Chart(document.getElementById("reachChart").getContext("2d"), {{
+  type: "bar",
+  data: {{
+    labels: {reach_labels},
+    datasets: [{{
+      label: "Alcance",
+      data: {reach_values},
+      backgroundColor: "rgba(92,107,192,0.7)",
+      borderColor: "#5c6bc0",
+      borderWidth: 1,
+      borderRadius: 4
+    }}]
+  }},
+  options: {{
+    responsive: true,
+    plugins: {{ legend: {{ display: false }} }},
+    scales: {{
+      x: {{ ticks: {{ color: "#8888aa", maxTicksLimit: 14 }}, grid: {{ color: "#1e1e38" }} }},
+      y: {{ ticks: {{ color: "#8888aa" }}, grid: {{ color: "#1e1e38" }} }}
+    }}
+  }}
+}});
+
+// ── Ranking por vida útil ────────────────────────────────────
+const GROWTH_POSTS  = {growth_json};
+const COLORS        = {colors_json};
+const TAG_COLORS    = {tag_colors_json};
+const CATEGORIES    = {categories_json};
+const METRIC_LABELS = {{ vida_util:"Vida útil (reach/h)", reach:"Alcance total", likes:"Likes", saved:"Guardados" }};
+
+let currentMetric = "vida_util";
+let rankingChart  = null;
+
+// Carga tags desde localStorage (sobreescribe los del HTML si existen)
+function loadLocalTags() {{
+  try {{ return JSON.parse(localStorage.getItem("serrat_tags") || "{{}}"); }} catch(e) {{ return {{}}; }}
+}}
+function mergeLocalTags(posts) {{
+  const local = loadLocalTags();
+  posts.forEach(p => {{ if (local[p.id]) p.tag = local[p.id]; }});
+}}
+mergeLocalTags(GROWTH_POSTS);
+
+function shortCap(caption, len) {{
+  len = len || 45;
+  return (caption||"").length > len ? (caption||"").slice(0, len) + "…" : (caption||"");
+}}
+
+function getVal(p, metric) {{
+  if (metric === "vida_util") return p.vida_util || 0;
+  const last = p.series[p.series.length - 1] || {{}};
+  return last[metric] || 0;
+}}
+
+function renderRanking() {{
+  const ranked = [...GROWTH_POSTS]
+    .filter(p => p.series && p.series.length > 0)
+    .sort((a, b) => getVal(b, currentMetric) - getVal(a, currentMetric));
+
+  const noData = ranked.length === 0;
+  document.getElementById("noDataMsg").style.display    = noData ? "block" : "none";
+  document.getElementById("rankingChart").style.display = noData ? "none"  : "block";
+  if (noData) {{ if (rankingChart) {{ rankingChart.destroy(); rankingChart = null; }} return; }}
+
+  const labels   = ranked.map(p => shortCap(p.caption || p.published, 40));
+  const values   = ranked.map(p => getVal(p, currentMetric));
+  const bgColors = ranked.map(p => (TAG_COLORS[p.tag] || "#5c6bc0") + "bb");
+  const borders  = ranked.map(p => TAG_COLORS[p.tag] || "#5c6bc0");
+  const maxVal   = Math.max(...values, 1);
+
+  const cfg = {{
+    type: "bar",
+    data: {{
+      labels,
+      datasets: [{{
+        data: values,
+        backgroundColor: bgColors,
+        borderColor: borders,
+        borderWidth: 1.5,
+        borderRadius: 5
+      }}]
+    }},
+    options: {{
+      indexAxis: "y",
+      responsive: true,
+      plugins: {{
+        legend: {{ display: false }},
+        tooltip: {{
+          backgroundColor: "#1a1a2e", borderColor: "#3a3a5c", borderWidth: 1,
+          titleColor: "#fff", bodyColor: "#cccce0",
+          callbacks: {{
+            title: items => shortCap(ranked[items[0].dataIndex].caption, 65),
+            label: item => {{
+              const p = ranked[item.dataIndex];
+              const last = p.series[p.series.length-1] || {{}};
+              if (currentMetric === "vida_util")
+                return ` Vida útil: ${{item.parsed.x.toFixed(1)}} reach/h · ${{Math.round(last.hours||0)}}h de vida`;
+              return ` ${{METRIC_LABELS[currentMetric]}}: ${{item.parsed.x.toLocaleString("es-CO")}}`;
+            }},
+            afterLabel: item => ` Tipo: ${{ranked[item.dataIndex].tag || "sin etiquetar"}}`
+          }}
+        }}
+      }},
+      scales: {{
+        x: {{ ticks: {{ color: "#8888aa" }}, grid: {{ color: "#1e1e38" }}, max: maxVal * 1.12 }},
+        y: {{ ticks: {{ color: "#ddddf0", font: {{ size: 11, cursor:"pointer" }} }}, grid: {{ color: "#1e1e38" }} }}
+      }},
+      onClick: (evt, elements) => {{
+        if (elements.length > 0) {{
+          const idx = elements[0].index;
+          openModal(ranked[idx].id);
+        }}
+      }},
+      onHover: (evt, elements) => {{
+        evt.native.target.style.cursor = elements.length > 0 ? "pointer" : "default";
+      }}
+    }}
+  }};
+
+  if (rankingChart) rankingChart.destroy();
+  rankingChart = new Chart(document.getElementById("rankingChart").getContext("2d"), cfg);
+}}
+
+document.querySelectorAll("#metricBtns .btn").forEach(btn => {{
+  btn.addEventListener("click", () => {{
+    document.querySelectorAll("#metricBtns .btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentMetric = btn.dataset.metric;
+    renderRanking();
+  }});
+}});
+
+renderRanking();
+
+// ── Tags inline ──────────────────────────────────────────────
+function saveTag(sel) {{
+  const pid = sel.dataset.pid;
+  const tag = sel.value;
+  const color = TAG_COLORS[tag] || "#555577";
+  sel.style.borderColor = color;
+  sel.style.color = color;
+
+  const local = loadLocalTags();
+  local[pid] = tag;
+  localStorage.setItem("serrat_tags", JSON.stringify(local));
+
+  // Actualizar GROWTH_POSTS en memoria para que los insights se actualicen
+  GROWTH_POSTS.forEach(p => {{ if (p.id === pid) p.tag = tag; }});
+  renderRanking();
+  renderInsights();
+
+  document.getElementById("saveTagsBtn").style.display = "inline-block";
+  document.getElementById("tagsNote").style.display = "inline";
+}}
+
+function exportTags() {{
+  const local = loadLocalTags();
+  const json = JSON.stringify(local, null, 2);
+  navigator.clipboard.writeText(json).then(() => {{
+    document.getElementById("saveTagsBtn").textContent = "✅ Copiado al portapapeles";
+    setTimeout(() => {{ document.getElementById("saveTagsBtn").textContent = "💾 Guardar etiquetas"; }}, 2500);
+  }});
+}}
+
+// Aplicar tags del localStorage a los selects de la tabla
+(function applyLocalTagsToSelects() {{
+  const local = loadLocalTags();
+  document.querySelectorAll(".tag-select").forEach(sel => {{
+    const pid = sel.dataset.pid;
+    if (local[pid]) {{
+      sel.value = local[pid];
+      const color = TAG_COLORS[local[pid]] || "#555577";
+      sel.style.borderColor = color;
+      sel.style.color = color;
+    }}
+  }});
+}})();
+
+// ── Insights por tipo ────────────────────────────────────────
+const ALL_POSTS_VU = {all_posts_json};
+mergeLocalTags(ALL_POSTS_VU);
+
+function avg(arr) {{ return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }}
+
+function renderInsightGroup(containerId, groups, unit) {{
+  const container = document.getElementById(containerId);
+  if (!groups.length) {{
+    container.innerHTML = '<p style="color:#444466;font-size:.75rem">Sin datos suficientes aún</p>';
+    return;
+  }}
+  const maxVal = Math.max(...groups.map(g => g.val), 0.01);
+  container.innerHTML = groups.map(g => {{
+    const pct = Math.round((g.val / maxVal) * 100);
+    const color = TAG_COLORS[g.label] || "#5c6bc0";
+    const valStr = unit === "reach/h" ? g.val.toFixed(1) : Math.round(g.val).toLocaleString("es-CO");
+    return `<div class="insight-row">
+      <span class="insight-label">${{g.label}}</span>
+      <div class="insight-bar-wrap"><div class="insight-bar" style="width:${{pct}}%;background:${{color}}"></div></div>
+      <span class="insight-val">${{valStr}} <span style="font-size:.6rem;color:#666">${{unit}}</span></span>
+    </div>`;
+  }}).join("") + `<p style="font-size:.65rem;color:#444466;margin-top:8px">${{groups.reduce((a,g)=>a+g.n,0)}} posts · ${{groups.map(g=>`${{g.label}}: ${{g.n}}`).join(", ")}}</p>`;
+}}
+
+function renderInsights() {{
+  const posts = ALL_POSTS_VU.filter(p => p.vida_util > 0);
+
+  // Por formato
+  const byFormat = {{}};
+  posts.forEach(p => {{
+    const fmt = p.type === "VIDEO" ? "Video" : p.type === "CAROUSEL_ALBUM" ? "Carrusel" : "Foto";
+    if (!byFormat[fmt]) byFormat[fmt] = [];
+    byFormat[fmt].push(p.vida_util);
+  }});
+  const formatGroups = Object.entries(byFormat)
+    .map(([label, vals]) => ({{ label, val: avg(vals), n: vals.length }}))
+    .sort((a,b) => b.val - a.val);
+  renderInsightGroup("insightFormat", formatGroups, "reach/h");
+
+  // Por tag
+  const byTag = {{}};
+  posts.forEach(p => {{
+    const t = p.tag || "sin etiquetar";
+    if (!byTag[t]) byTag[t] = [];
+    byTag[t].push(p.vida_util);
+  }});
+  const tagGroups = Object.entries(byTag)
+    .filter(([k]) => k !== "sin etiquetar")
+    .map(([label, vals]) => ({{ label, val: avg(vals), n: vals.length }}))
+    .sort((a,b) => b.val - a.val);
+  renderInsightGroup("insightTag", tagGroups.length ? tagGroups : [], "reach/h");
+
+  // Por hora de publicación (Colombia = UTC-5)
+  const bySlot = {{ "Mañana (<12h)": [], "Tarde (12-18h)": [], "Noche (>18h)": [] }};
+  posts.forEach(p => {{
+    if (!p.published_at) return;
+    const utcH = new Date(p.published_at.replace("+0000","Z")).getUTCHours();
+    const colH = (utcH - 5 + 24) % 24;
+    if (colH < 12) bySlot["Mañana (<12h)"].push(p.vida_util);
+    else if (colH < 18) bySlot["Tarde (12-18h)"].push(p.vida_util);
+    else bySlot["Noche (>18h)"].push(p.vida_util);
+  }});
+  const hourGroups = Object.entries(bySlot)
+    .filter(([,vals]) => vals.length > 0)
+    .map(([label, vals]) => ({{ label, val: avg(vals), n: vals.length }}))
+    .sort((a,b) => b.val - a.val);
+  renderInsightGroup("insightHour", hourGroups, "reach/h");
+}}
+
+renderInsights();
+
+// ── Modal de detalle por post ────────────────────────────────
+let modalChart   = null;
+let modalPost    = null;
+let modalMetric  = "vida_util";
+
+const ALL_POSTS  = ALL_POSTS_VU;
+const POST_INDEX = {{}};
+ALL_POSTS.forEach(p => POST_INDEX[p.id] = p);
+
+function openModal(pid) {{
+  modalPost   = POST_INDEX[pid] || null;
+  modalMetric = "vida_util";
+
+  document.querySelectorAll("#modalMetricBtns .btn").forEach(b => {{
+    b.classList.toggle("active", b.dataset.m === "vida_util");
+  }});
+
+  document.getElementById("modalOverlay").classList.add("open");
+  document.body.style.overflow = "hidden";
+  renderModalChart();
+}}
+
+function closeModal() {{
+  document.getElementById("modalOverlay").classList.remove("open");
+  document.body.style.overflow = "";
+  if (modalChart) {{ modalChart.destroy(); modalChart = null; }}
+}}
+
+function renderModalChart() {{
+  if (!modalPost) return;
+  const post = modalPost;
+
+  // Cabecera
+  document.getElementById("modalTitle").textContent = post.caption || post.published;
+  const typeIcon = {{ IMAGE:"🖼️", VIDEO:"🎥", CAROUSEL_ALBUM:"🎞️" }}[post.type] || "📄";
+  document.getElementById("modalMeta").innerHTML =
+    `${{typeIcon}} &nbsp; Publicado el ${{post.published}} &nbsp;·&nbsp; `+
+    `<a href="${{post.permalink}}" target="_blank" style="color:#7986cb">Ver en Instagram ↗</a>`;
+
+  // Stats actuales (último snapshot)
+  const last = post.series[post.series.length - 1] || {{}};
+  const vuLast = (post.vu_series && post.vu_series[post.vu_series.length-1] || {{}}).vu || 0;
+  document.getElementById("modalStats").innerHTML = [
+    ["Vida útil", vuLast.toFixed(1) + " r/h"],
+    ["Alcance", (last.reach||0).toLocaleString("es-CO")],
+    ["Likes", (last.likes||0).toLocaleString("es-CO")],
+    ["Guardados", (last.saved||0).toLocaleString("es-CO")],
+    ["Horas activo", Math.round(last.hours||0)],
+    ["Tipo", post.tag || "sin etiquetar"]
+  ].map(([l,v]) => `<div class="modal-stat"><div class="s-label">${{l}}</div><div class="s-value" style="font-size:1.1rem">${{v}}</div></div>`).join("");
+
+  // Sin datos suficientes
+  const hasSeries = post.series.length >= 2;
+  const hasOne    = post.series.length === 1;
+  document.getElementById("modalNoData").style.display  = (!hasSeries) ? "block" : "none";
+  document.getElementById("modalChart").style.display   = hasSeries ? "block" : "none";
+  if (!hasSeries) {{
+    const last0 = post.series[0] || {{}};
+    document.getElementById("modalNoData").innerHTML =
+      hasOne
+        ? `<strong style="color:#8888aa">Solo 1 medición disponible</strong> (a las ${{Math.round(last0.hours||0)}}h de vida)<br>
+           Vuelve mañana para ver cómo está evolucionando. 📅`
+        : `Aún no hay snapshots para este post. 📅`;
+    return;
+  }}
+
+  // Obtener serie del post según métrica seleccionada
+  let hours, postVals, avgVals, yLabel;
+
+  if (modalMetric === "vida_util") {{
+    const vuSeries = post.vu_series || [];
+    hours    = vuSeries.map(s => s.hours||0).sort((a,b) => a-b);
+    postVals = hours.map(h => {{ const s = vuSeries.find(x=>(x.hours||0)===h); return s ? s.vu : null; }});
+    // Promedio de vida útil global
+    const avgVuByH = {{}}, cntH = {{}};
+    ALL_POSTS.forEach(p => (p.vu_series||[]).forEach(s => {{
+      const h = s.hours||0;
+      avgVuByH[h] = (avgVuByH[h]||0) + (s.vu||0);
+      cntH[h]     = (cntH[h]||0) + 1;
+    }}));
+    avgVals = hours.map(h => cntH[h] ? +(avgVuByH[h]/cntH[h]).toFixed(2) : null);
+    yLabel  = "reach/hora";
+  }} else {{
+    const avgByDay = {{}}, countByDay = {{}};
+    ALL_POSTS.forEach(p => p.series.forEach(s => {{
+      const h = s.hours || 0;
+      avgByDay[h]   = (avgByDay[h]   || 0) + (s[modalMetric] || 0);
+      countByDay[h] = (countByDay[h] || 0) + 1;
+    }}));
+    hours    = post.series.map(s => s.hours||0).sort((a,b) => a-b);
+    postVals = hours.map(h => {{ const s = post.series.find(x=>(x.hours||0)===h); return s ? s[modalMetric]||0 : null; }});
+    avgVals  = hours.map(h => countByDay[h] ? Math.round(avgByDay[h]/countByDay[h]) : null);
+    yLabel   = METRIC_LABELS[modalMetric] || modalMetric;
+  }}
+
+  function fmtHours(h) {{ return h < 168 ? `${{h}}h` : `${{Math.round(h/24)}}d`; }}
+
+  if (modalChart) modalChart.destroy();
+  modalChart = new Chart(document.getElementById("modalChart").getContext("2d"), {{
+    type: "bar",
+    data: {{
+      labels: hours.map(h => fmtHours(h)),
+      datasets: [
+        {{
+          label: "Este post",
+          data: postVals,
+          backgroundColor: "rgba(92,107,192,0.75)",
+          borderColor: "#5c6bc0",
+          borderWidth: 1.5,
+          borderRadius: 5,
+          order: 2
+        }},
+        {{
+          label: "Promedio general",
+          data: avgVals,
+          type: "line",
+          borderColor: "#fb8c00",
+          backgroundColor: "transparent",
+          borderDash: [5,4],
+          pointRadius: 5, pointHoverRadius: 7,
+          tension: 0, borderWidth: 2,
+          order: 1
+        }}
+      ]
+    }},
+    options: {{
+      responsive: true,
+      plugins: {{
+        legend: {{ display: true, labels: {{ color: "#9090cc", font: {{ size: 11 }}, boxWidth: 14 }} }},
+        tooltip: {{
+          backgroundColor: "#1a1a2e", borderColor: "#3a3a5c", borderWidth: 1,
+          titleColor: "#fff", bodyColor: "#cccce0",
+          callbacks: {{
+            label: item => ` ${{item.dataset.label}}: ${{(item.parsed.y||0).toLocaleString("es-CO")}}`
+          }}
+        }}
+      }},
+      scales: {{
+        x: {{ ticks: {{ color: "#8888aa" }}, grid: {{ color: "#1e1e38" }} }},
+        y: {{
+          title: {{ display: true, text: yLabel, color: "#8888aa" }},
+          ticks: {{ color: "#8888aa" }}, grid: {{ color: "#1e1e38" }}
+        }}
+      }}
+    }}
+  }});
+}}
+
+document.querySelectorAll("#modalMetricBtns .btn").forEach(btn => {{
+  btn.addEventListener("click", () => {{
+    document.querySelectorAll("#modalMetricBtns .btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    modalMetric = btn.dataset.m;
+    if (modalChart) {{ modalChart.destroy(); modalChart = null; }}
+    renderModalChart();
+  }});
+}});
+
+// Cerrar con Escape
+document.addEventListener("keydown", e => {{ if (e.key === "Escape") closeModal(); }});
+</script>
+</body>
+</html>"""
+
+# ── Main ──────────────────────────────────────────────────────
+
+def main():
+    print("⏳ Obteniendo datos de Instagram...")
+
+    print("  → Perfil...")
+    perfil = get_perfil()
+
+    print("  → Insights 28 días...")
+    insights = get_insights_28d()
+
+    print("  → Posts recientes...")
+    posts = get_posts(30)
+
+    print("  → Demografía...")
+    demo = get_demografia()
+
+    print("  → Guardando snapshot diario...")
+    OUT.parent.mkdir(exist_ok=True)
+    history = save_snapshot(posts)
+
+    print("  → Generando HTML...")
+    html = build_html(perfil, insights, posts, demo, history)
+    OUT.write_text(html, encoding="utf-8")
+
+    snapshots_count = len(history)
+    print(f"\n✅ Dashboard generado: {OUT}")
+    print(f"   Seguidores: {perfil.get('followers_count'):,}")
+    print(f"   Alcance 28d: {insights.get('reach'):,}")
+    print(f"   Posts procesados: {len(posts)}")
+    print(f"   Snapshots acumulados: {snapshots_count}")
+
+    import subprocess
+    subprocess.Popen(["open", str(OUT)])
+
+if __name__ == "__main__":
+    main()
