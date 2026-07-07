@@ -316,7 +316,7 @@ def build_html(perfil, insights, posts, demo, history):
     saves    = ins28.get("saves", 0)
 
     tags = load_tags()
-    eng_rate = round(inter / followers * 100, 2) if followers else 0
+    eng_rate = round(inter / reach * 100, 2) if reach else 0
 
     reach_labels = json.dumps([d["date"] for d in ins28.get("reach_daily", [])])
     reach_values = json.dumps([d["value"] for d in ins28.get("reach_daily", [])])
@@ -539,7 +539,7 @@ def build_html(perfil, insights, posts, demo, history):
     <div class="kpi purple"><div class="label">Visitas de perfil</div><div class="value kpi-val" data-key="profile_views">{pviews:,}</div></div>
     <div class="kpi orange"><div class="label">Clics al sitio web</div><div class="value kpi-val" data-key="website_clicks">{wclicks:,}</div></div>
     <div class="kpi teal"><div class="label">Seguidores ganados</div><div class="value kpi-val" data-key="follower_count">{fgained:,}</div></div>
-    <div class="kpi pink"><div class="label">Tasa de engagement</div><div class="value" id="kpiEng">{eng_rate}%</div><div class="sub">interacciones / seguidores</div></div>
+    <div class="kpi pink"><div class="label">Tasa de engagement</div><div class="value" id="kpiEng">{eng_rate}%</div><div class="sub">interacciones / alcance</div></div>
   </div>
 
   <div class="kpi-grid" style="margin-top:14px">
@@ -676,8 +676,8 @@ function renderWindow(w) {{
   }});
 
   // Engagement
-  const eng = ins.total_interactions && {followers}
-    ? (ins.total_interactions / {followers} * 100).toFixed(2) + "%"
+  const eng = ins.total_interactions && ins.reach
+    ? (ins.total_interactions / ins.reach * 100).toFixed(2) + "%"
     : "0%";
   document.getElementById("kpiEng").textContent = eng;
 
