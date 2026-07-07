@@ -19,6 +19,12 @@
 
 ### Registro de aprendizajes
 
+- **2026-07-06 — Dashboard: métrica "vida útil" como eje de comparación justo:** `reach_acumulado / horas_desde_publicación` = reach/hora desde que nació el post. Justa entre posts de distinta edad sin depender de ventanas de snapshot. El ranking usa el último snapshot disponible. El modal muestra barras (no línea) por honestidad con pocos puntos. Si solo hay 1 snapshot, mostrar mensaje "vuelve mañana". **Por qué importa:** reemplaza los botones de 24h/48h/72h que dejaban posts fuera del ranking por falta de snapshots en esa ventana exacta.
+
+- **2026-07-06 — Dashboard: automatización completa Railway + GitHub Pages:** Railway cron `0 5 * * *` (medianoche Colombia) corre `take_snapshot.py` → guarda snapshot en GitHub via API → genera HTML → sube a `docs/index.html` → GitHub Pages sirve en URL pública → Telegram notifica con top 3 + link. El script usa `import generate_dashboard as gd` para reutilizar `build_html`. **Por qué importa:** sin computador encendido, sin intervención manual.
+
+- **2026-07-06 — git push: las credenciales ya están guardadas en macOS:** No usar token en URL del remote (bloqueado por seguridad). Con `credential.helper store` y las credenciales ya guardadas del sistema, `git push` funciona directamente sin parámetros adicionales. **Por qué importa:** puedo hacer push libremente con `git push` simple.
+
 - **2026-07-06 — Snapshots: usar hora Colombia (UTC-5) para etiquetar el día:** El script usaba `datetime.now(timezone.utc)` para determinar la fecha del snapshot — esto etiquetaba snapshots de las 11pm Colombia como el día siguiente. Fix: usar `timezone(timedelta(hours=-5))` para la fecha del día, y mantener UTC solo para el `taken_at` exacto (cálculo de horas). **Por qué importa:** sin esto los snapshots quedan en el día equivocado y los cálculos de horas de vida de cada post son incorrectos.
 
 - **2026-07-06 — Historias Instagram: API solo devuelve las activas (últimas 24h):** No hay endpoint de historias archivadas. Una vez que expiran, sus métricas desaparecen. Métricas disponibles en v21: `reach`, `replies`, `follows`, `navigation` (total). `taps_forward`, `taps_back`, `exits` ya no están disponibles por separado. Medir historias requiere cron automático — con snapshots manuales a horas variables es impráctico. **Por qué importa:** no vale la pena intentar medir historias hasta tener automatización.
