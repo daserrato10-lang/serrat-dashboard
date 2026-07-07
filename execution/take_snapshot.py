@@ -66,20 +66,51 @@ def ig_get(path, params=None):
         raise RuntimeError(data["error"]["message"])
     return data
 
-def get_posts(limit=30):
+def fetch_post_metrics(post):
+    """Agrega métricas de reach/saved/shares a un dict de post."""
+    try:
+        ins = ig_get(f"{post['id']}/insights", {"metric": "reach,saved,shares"})
+        for m in ins.get("data", []):
+            post[f"metric_{m['name']}"] = (m.get("values") or [{}])[0].get("value", 0)
+    except Exception:
+        post["metric_reach"] = post.get("metric_reach", 0)
+        post["metric_saved"] = post.get("metric_saved", 0)
+        post["metric_shares"] = post.get("metric_shares", 0)
+    time.sleep(0.15)
+    return post
+
+def fetch_single_post(post_id):
+    """Obtiene datos básicos de un post por ID."""
+    try:
+        return ig_get(post_id, {
+            "fields": "id,caption,media_type,timestamp,like_count,comments_count,permalink"
+        })
+    except Exception:
+        return None
+
+def get_posts(limit=30, history=None):
+    """Obtiene los últimos `limit` posts + cualquier post histórico que ya esté en tracking."""
     media = ig_get(f"{IG_ID}/media", {
         "fields": "id,caption,media_type,timestamp,like_count,comments_count,permalink",
         "limit": limit
     })
     posts = media.get("data", [])
+    recent_ids = {p["id"] for p in posts}
+
+    # Posts históricos que ya no están en los últimos 30
+    if history:
+        all_tracked = set()
+        for day_data in history.values():
+            all_tracked.update(pid for pid in day_data if pid != "_meta")
+        extra_ids = all_tracked - recent_ids
+        for pid in extra_ids:
+            p = fetch_single_post(pid)
+            if p:
+                posts.append(p)
+
     for post in posts:
-        try:
-            ins = ig_get(f"{post['id']}/insights", {"metric": "reach,saved,shares"})
-            for m in ins.get("data", []):
-                post[f"metric_{m['name']}"] = (m.get("values") or [{}])[0].get("value", 0)
-        except Exception:
-            post["metric_reach"] = post["metric_saved"] = post["metric_shares"] = 0
-        time.sleep(0.15)
+        fetch_post_metrics(post)
+
     return posts
 
 # ── GitHub API — leer y escribir post_snapshots.json ─────────
@@ -200,7 +231,7 @@ def main():
         num_prev = len([k for k in history if not k.startswith("_")])
 
         print("  → Obteniendo posts de Instagram...")
-        posts = get_posts(30)
+        posts = get_posts(30, history)
 
         print("  → Guardando snapshot...")
         history, today, saved = take_snapshot(posts, history)
