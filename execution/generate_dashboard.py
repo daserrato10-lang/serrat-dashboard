@@ -912,14 +912,18 @@ function renderInsightGroup(containerId, groups, unit) {{
     return;
   }}
   const maxVal = Math.max(...groups.map(g => g.val), 0.01);
+  const showReach = groups.some(g => g.reach != null);
   container.innerHTML = groups.map(g => {{
     const pct = Math.round((g.val / maxVal) * 100);
     const color = TAG_COLORS[g.label] || "#5c6bc0";
     const valStr = unit === "reach/h" ? g.val.toFixed(1) : Math.round(g.val).toLocaleString("es-CO");
+    const reachStr = showReach && g.reach != null
+      ? `<span style="font-size:.65rem;color:#888;margin-left:8px">· alcance prom: ${{Math.round(g.reach).toLocaleString("es-CO")}}</span>`
+      : "";
     return `<div class="insight-row">
       <span class="insight-label">${{g.label}}</span>
       <div class="insight-bar-wrap"><div class="insight-bar" style="width:${{pct}}%;background:${{color}}"></div></div>
-      <span class="insight-val">${{valStr}} <span style="font-size:.6rem;color:#666">${{unit}}</span></span>
+      <span class="insight-val">${{valStr}} <span style="font-size:.6rem;color:#666">${{unit}}</span>${{reachStr}}</span>
     </div>`;
   }}).join("") + `<p style="font-size:.65rem;color:#444466;margin-top:8px">${{groups.reduce((a,g)=>a+g.n,0)}} posts · ${{groups.map(g=>`${{g.label}}: ${{g.n}}`).join(", ")}}</p>`;
 }}
@@ -927,15 +931,18 @@ function renderInsightGroup(containerId, groups, unit) {{
 function renderInsights() {{
   const posts = ALL_POSTS_VU.filter(p => p.vida_util > 0);
 
-  // Por formato
+  // Por formato — vida útil + reach total promedio
   const byFormat = {{}};
-  posts.forEach(p => {{
+  ALL_POSTS_VU.forEach(p => {{
     const fmt = p.type === "VIDEO" ? "Video" : p.type === "CAROUSEL_ALBUM" ? "Carrusel" : "Foto";
-    if (!byFormat[fmt]) byFormat[fmt] = [];
-    byFormat[fmt].push(p.vida_util);
+    if (!byFormat[fmt]) byFormat[fmt] = {{ vu: [], reach: [] }};
+    if (p.vida_util > 0) byFormat[fmt].vu.push(p.vida_util);
+    const lastSnap = p.series && p.series.length ? p.series[p.series.length-1] : null;
+    if (lastSnap && lastSnap.reach > 0) byFormat[fmt].reach.push(lastSnap.reach);
   }});
   const formatGroups = Object.entries(byFormat)
-    .map(([label, vals]) => ({{ label, val: avg(vals), n: vals.length }}))
+    .filter(([,d]) => d.vu.length > 0)
+    .map(([label, d]) => ({{ label, val: avg(d.vu), reach: avg(d.reach), n: d.vu.length }}))
     .sort((a,b) => b.val - a.val);
   renderInsightGroup("insightFormat", formatGroups, "reach/h");
 
