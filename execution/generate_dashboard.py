@@ -49,8 +49,8 @@ def ig_get(path, params=None):
 def get_perfil():
     return ig_get(IG_ID, {"fields": "username,followers_count,follows_count,media_count,website"})
 
-def get_insights_28d():
-    since = int((datetime.now(timezone.utc) - timedelta(days=28)).timestamp())
+def get_insights(days=28):
+    since = int((datetime.now(timezone.utc) - timedelta(days=days)).timestamp())
     until = int(datetime.now(timezone.utc).timestamp())
     daily  = ig_get(f"{IG_ID}/insights", {
         "metric": "reach,follower_count", "period": "day",
@@ -70,6 +70,13 @@ def get_insights_28d():
     for m in totals.get("data", []):
         result[m["name"]] = (m.get("total_value") or {}).get("value", 0)
     return result
+
+def get_all_insights():
+    results = {}
+    for days in [7, 14, 28]:
+        results[days] = get_insights(days)
+        time.sleep(0.3)
+    return results
 
 def get_posts(limit=30):
     media = ig_get(f"{IG_ID}/media", {
@@ -286,23 +293,34 @@ TAG_COLORS = {
 }
 
 def build_html(perfil, insights, posts, demo, history):
+    # insights puede ser {7: {...}, 14: {...}, 28: {...}} o dict plano (legacy)
+    if isinstance(insights, dict) and 7 in insights:
+        insights_by_window = {str(k): v for k, v in insights.items()}
+        ins28 = insights.get(28, {})
+    else:
+        insights_by_window = {"7": insights, "14": insights, "28": insights}
+        ins28 = insights
+
     updated   = datetime.now().strftime("%d %b %Y, %I:%M %p")
     followers = perfil.get("followers_count", 0)
-    reach     = insights.get("reach", 0)
-    pviews    = insights.get("profile_views", 0)
-    wclicks   = insights.get("website_clicks", 0)
-    fgained   = insights.get("follower_count", 0)
-    inter     = insights.get("total_interactions", 0)
-    likes     = insights.get("likes", 0)
-    comments  = insights.get("comments", 0)
-    shares    = insights.get("shares", 0)
-    saves     = insights.get("saves", 0)
+
+    # Valores por defecto para el render inicial (28d)
+    reach    = ins28.get("reach", 0)
+    pviews   = ins28.get("profile_views", 0)
+    wclicks  = ins28.get("website_clicks", 0)
+    fgained  = ins28.get("follower_count", 0)
+    inter    = ins28.get("total_interactions", 0)
+    likes    = ins28.get("likes", 0)
+    comments = ins28.get("comments", 0)
+    shares   = ins28.get("shares", 0)
+    saves    = ins28.get("saves", 0)
 
     tags = load_tags()
-    eng_rate  = round(inter / followers * 100, 2) if followers else 0
+    eng_rate = round(inter / followers * 100, 2) if followers else 0
 
-    reach_labels = json.dumps([d["date"] for d in insights.get("reach_daily", [])])
-    reach_values = json.dumps([d["value"] for d in insights.get("reach_daily", [])])
+    reach_labels = json.dumps([d["date"] for d in ins28.get("reach_daily", [])])
+    reach_values = json.dumps([d["value"] for d in ins28.get("reach_daily", [])])
+    insights_json = json.dumps(insights_by_window)
 
     # Growth data — ranking (solo posts desde primer snapshot) y modal (todos)
     growth_posts   = build_growth_data(history)
@@ -497,27 +515,43 @@ def build_html(perfil, insights, posts, demo, history):
 
 <div class="content">
 
+  <!-- KPIs estáticos -->
   <h2>Cuenta</h2>
   <div class="kpi-grid">
-    <div class="kpi green"><div class="label">Seguidores</div><div class="value">{followers:,}</div></div>
-    <div class="kpi blue"><div class="label">Alcance total (28d)</div><div class="value">{reach:,}</div></div>
-    <div class="kpi purple"><div class="label">Visitas de perfil (28d)</div><div class="value">{pviews:,}</div></div>
-    <div class="kpi orange"><div class="label">Clics al sitio web (28d)</div><div class="value">{wclicks:,}</div></div>
-    <div class="kpi teal"><div class="label">Seguidores ganados (28d)</div><div class="value">{fgained:,}</div></div>
-    <div class="kpi pink"><div class="label">Tasa de engagement</div><div class="value">{eng_rate}%</div><div class="sub">interacciones / seguidores</div></div>
+    <div class="kpi green">
+      <div class="label">Seguidores</div>
+      <div class="value">{followers:,}</div>
+      <div class="sub">total actual</div>
+    </div>
   </div>
 
-  <h2>Interacciones (28 días)</h2>
-  <div class="kpi-grid">
-    <div class="kpi blue"><div class="label">Total interacciones</div><div class="value">{inter:,}</div></div>
-    <div class="kpi pink"><div class="label">Likes</div><div class="value">{likes:,}</div></div>
-    <div class="kpi purple"><div class="label">Comentarios</div><div class="value">{comments:,}</div></div>
-    <div class="kpi teal"><div class="label">Compartidos</div><div class="value">{shares:,}</div></div>
-    <div class="kpi orange"><div class="label">Guardados</div><div class="value">{saves:,}</div></div>
+  <!-- KPIs con filtro de tiempo -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:28px;margin-bottom:14px">
+    <h2 style="margin:0">Métricas del período</h2>
+    <div class="btn-group" id="windowBtns">
+      <button class="btn" data-w="7">7 días</button>
+      <button class="btn" data-w="14">14 días</button>
+      <button class="btn active" data-w="28">28 días</button>
+    </div>
+  </div>
+  <div class="kpi-grid" id="kpiPeriod">
+    <div class="kpi blue"><div class="label">Alcance</div><div class="value kpi-val" data-key="reach">{reach:,}</div></div>
+    <div class="kpi purple"><div class="label">Visitas de perfil</div><div class="value kpi-val" data-key="profile_views">{pviews:,}</div></div>
+    <div class="kpi orange"><div class="label">Clics al sitio web</div><div class="value kpi-val" data-key="website_clicks">{wclicks:,}</div></div>
+    <div class="kpi teal"><div class="label">Seguidores ganados</div><div class="value kpi-val" data-key="follower_count">{fgained:,}</div></div>
+    <div class="kpi pink"><div class="label">Tasa de engagement</div><div class="value" id="kpiEng">{eng_rate}%</div><div class="sub">interacciones / seguidores</div></div>
   </div>
 
-  <div class="card">
-    <h2 style="margin-top:0">Alcance diario (28d)</h2>
+  <div class="kpi-grid" style="margin-top:14px">
+    <div class="kpi blue"><div class="label">Total interacciones</div><div class="value kpi-val" data-key="total_interactions">{inter:,}</div></div>
+    <div class="kpi pink"><div class="label">Likes</div><div class="value kpi-val" data-key="likes">{likes:,}</div></div>
+    <div class="kpi purple"><div class="label">Comentarios</div><div class="value kpi-val" data-key="comments">{comments:,}</div></div>
+    <div class="kpi teal"><div class="label">Compartidos</div><div class="value kpi-val" data-key="shares">{shares:,}</div></div>
+    <div class="kpi orange"><div class="label">Guardados</div><div class="value kpi-val" data-key="saves">{saves:,}</div></div>
+  </div>
+
+  <div class="card" style="margin-top:20px">
+    <h2 style="margin-top:0">Alcance diario <span id="reachChartLabel">(28d)</span></h2>
     <canvas id="reachChart" style="max-height:200px"></canvas>
   </div>
 
@@ -627,29 +661,67 @@ def build_html(perfil, insights, posts, demo, history):
 </div>
 
 <script>
-// ── Alcance diario ───────────────────────────────────────────
-new Chart(document.getElementById("reachChart").getContext("2d"), {{
-  type: "bar",
-  data: {{
-    labels: {reach_labels},
-    datasets: [{{
-      label: "Alcance",
-      data: {reach_values},
-      backgroundColor: "rgba(92,107,192,0.7)",
-      borderColor: "#5c6bc0",
-      borderWidth: 1,
-      borderRadius: 4
-    }}]
-  }},
-  options: {{
-    responsive: true,
-    plugins: {{ legend: {{ display: false }} }},
-    scales: {{
-      x: {{ ticks: {{ color: "#8888aa", maxTicksLimit: 14 }}, grid: {{ color: "#1e1e38" }} }},
-      y: {{ ticks: {{ color: "#8888aa" }}, grid: {{ color: "#1e1e38" }} }}
+// ── Filtro de ventana temporal ───────────────────────────────
+const INSIGHTS = {insights_json};
+let reachChart = null;
+
+function fmt(n) {{ return (n||0).toLocaleString("es-CO"); }}
+
+function renderWindow(w) {{
+  const ins = INSIGHTS[String(w)] || {{}};
+
+  // Actualizar KPIs
+  document.querySelectorAll(".kpi-val").forEach(el => {{
+    el.textContent = fmt(ins[el.dataset.key]);
+  }});
+
+  // Engagement
+  const eng = ins.total_interactions && {followers}
+    ? (ins.total_interactions / {followers} * 100).toFixed(2) + "%"
+    : "0%";
+  document.getElementById("kpiEng").textContent = eng;
+
+  // Gráfico de alcance
+  const daily = ins.reach_daily || [];
+  const labels = daily.map(d => d.date);
+  const values = daily.map(d => d.value);
+  document.getElementById("reachChartLabel").textContent = `(${{w}}d)`;
+
+  if (reachChart) reachChart.destroy();
+  reachChart = new Chart(document.getElementById("reachChart").getContext("2d"), {{
+    type: "bar",
+    data: {{
+      labels,
+      datasets: [{{
+        label: "Alcance",
+        data: values,
+        backgroundColor: "rgba(92,107,192,0.7)",
+        borderColor: "#5c6bc0",
+        borderWidth: 1,
+        borderRadius: 4
+      }}]
+    }},
+    options: {{
+      responsive: true,
+      plugins: {{ legend: {{ display: false }} }},
+      scales: {{
+        x: {{ ticks: {{ color: "#8888aa", maxTicksLimit: 14 }}, grid: {{ color: "#1e1e38" }} }},
+        y: {{ ticks: {{ color: "#8888aa" }}, grid: {{ color: "#1e1e38" }} }}
+      }}
     }}
-  }}
+  }});
+}}
+
+document.querySelectorAll("#windowBtns .btn").forEach(btn => {{
+  btn.addEventListener("click", () => {{
+    document.querySelectorAll("#windowBtns .btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    renderWindow(parseInt(btn.dataset.w));
+  }});
 }});
+
+renderWindow(28); // render inicial
+
 
 // ── Ranking por vida útil ────────────────────────────────────
 const GROWTH_POSTS  = {growth_json};
@@ -1068,8 +1140,8 @@ def main():
     print("  → Perfil...")
     perfil = get_perfil()
 
-    print("  → Insights 28 días...")
-    insights = get_insights_28d()
+    print("  → Insights 7/14/28 días...")
+    insights = get_all_insights()
 
     print("  → Posts recientes...")
     posts = get_posts(30)
@@ -1097,7 +1169,8 @@ def main():
     snapshots_count = len(history)
     print(f"\n✅ Dashboard generado: {OUT}")
     print(f"   Seguidores: {perfil.get('followers_count'):,}")
-    print(f"   Alcance 28d: {insights.get('reach'):,}")
+    ins28 = insights.get(28, insights) if isinstance(insights, dict) and 28 in insights else insights
+    print(f"   Alcance 28d: {ins28.get('reach', 0):,}")
     print(f"   Posts procesados: {len(posts)}")
     print(f"   Snapshots acumulados: {snapshots_count}")
 

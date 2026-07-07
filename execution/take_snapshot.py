@@ -219,7 +219,7 @@ def main():
 
         print("  → Obteniendo datos adicionales para el dashboard...")
         perfil   = gd.get_perfil()
-        insights = gd.get_insights_28d()
+        insights = gd.get_all_insights()
         demo     = gd.get_demografia()
 
         print("  → Generando dashboard HTML...")
