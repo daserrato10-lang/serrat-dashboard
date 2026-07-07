@@ -28,9 +28,11 @@ def load_env():
                 env[k.strip()] = v.strip()
     return env
 
-cfg   = load_env()
-TOKEN = cfg.get("IG_TOKEN", os.environ.get("IG_TOKEN", ""))
-IG_ID = cfg.get("IG_ID",    os.environ.get("IG_ID", ""))
+cfg      = load_env()
+TOKEN    = cfg.get("IG_TOKEN",  os.environ.get("IG_TOKEN", ""))
+IG_ID    = cfg.get("IG_ID",     os.environ.get("IG_ID", ""))
+GH_TOKEN = cfg.get("GH_TOKEN",  os.environ.get("GH_TOKEN", ""))
+GH_REPO  = cfg.get("GH_REPO",   os.environ.get("GH_REPO", ""))
 BASE  = "https://graph.facebook.com/v21.0"
 
 # ── API ───────────────────────────────────────────────────────
@@ -595,8 +597,8 @@ def build_html(perfil, insights, posts, demo, history):
 
   <h2>Últimos 30 posts <small style="color:#555588;font-size:.7rem;font-weight:400">— haz clic en cualquier fila para ver su historial · cambia el tipo de contenido con el selector</small></h2>
   <div class="save-tags-wrap">
-    <span class="save-tags-note" id="tagsNote">Cambios sin guardar — cierra y vuelve a abrir el dashboard para que los insights se actualicen</span>
-    <button class="save-tags-btn" id="saveTagsBtn" onclick="exportTags()">💾 Guardar etiquetas</button>
+    <span class="save-tags-note" id="tagsNote">Cambios sin guardar</span>
+    <button class="save-tags-btn" id="saveTagsBtn" onclick="saveTags()">💾 Guardar etiquetas</button>
   </div>
   <div class="table-wrap">
     <table>
@@ -854,13 +856,33 @@ function saveTag(sel) {{
   document.getElementById("tagsNote").style.display = "inline";
 }}
 
-function exportTags() {{
-  const local = loadLocalTags();
-  const json = JSON.stringify(local, null, 2);
-  navigator.clipboard.writeText(json).then(() => {{
-    document.getElementById("saveTagsBtn").textContent = "✅ Copiado al portapapeles";
-    setTimeout(() => {{ document.getElementById("saveTagsBtn").textContent = "💾 Guardar etiquetas"; }}, 2500);
-  }});
+async function saveTags() {{
+  const btn  = document.getElementById("saveTagsBtn");
+  const note = document.getElementById("tagsNote");
+  btn.textContent = "⏳ Guardando…";
+  btn.disabled = true;
+
+  try {{
+    const local = loadLocalTags();
+    const res = await fetch("/save-tags", {{
+      method: "POST",
+      headers: {{ "Content-Type": "application/json" }},
+      body: JSON.stringify(local)
+    }});
+
+    if (res.ok) {{
+      btn.textContent = "✅ Guardado";
+      note.style.display = "none";
+      setTimeout(() => {{ btn.textContent = "💾 Guardar etiquetas"; btn.disabled = false; }}, 3000);
+    }} else {{
+      const err = await res.json().catch(() => ({{}}));
+      throw new Error(err.error || res.status);
+    }}
+  }} catch(e) {{
+    btn.textContent = "❌ Error — reintenta";
+    btn.disabled = false;
+    console.error("Error guardando tags:", e);
+  }}
 }}
 
 // Aplicar tags del localStorage a los selects de la tabla
