@@ -1044,6 +1044,24 @@ document.addEventListener("keydown", e => {{ if (e.key === "Escape") closeModal(
 
 # ── Main ──────────────────────────────────────────────────────
 
+def fetch_snapshots_from_github():
+    """Lee post_snapshots.json desde GitHub si no hay archivo local."""
+    import base64, urllib.error
+    gh_token = cfg.get("GH_TOKEN", os.environ.get("GH_TOKEN", ""))
+    gh_repo  = cfg.get("GH_REPO",  os.environ.get("GH_REPO", ""))
+    if not gh_token or not gh_repo:
+        return None
+    url = f"https://api.github.com/repos/{gh_repo}/contents/data/post_snapshots.json"
+    headers = {"Authorization": f"Bearer {gh_token}", "Accept": "application/vnd.github+json"}
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=15) as r:
+            d = json.loads(r.read())
+        return json.loads(base64.b64decode(d["content"]))
+    except Exception as e:
+        print(f"  ⚠️  No se pudo leer de GitHub: {e}")
+        return None
+
 def main():
     print("⏳ Obteniendo datos de Instagram...")
 
@@ -1061,6 +1079,15 @@ def main():
 
     print("  → Guardando snapshot diario...")
     OUT.parent.mkdir(exist_ok=True)
+
+    # Si no hay snapshot local, jalar de GitHub
+    if not SNAPSHOTS.exists():
+        print("  → No hay snapshot local — descargando de GitHub...")
+        remote = fetch_snapshots_from_github()
+        if remote:
+            SNAPSHOTS.write_text(json.dumps(remote, ensure_ascii=False, indent=2))
+            print(f"  ✅ {len([k for k in remote if not k.startswith('_')])} snapshots descargados de GitHub")
+
     history = save_snapshot(posts)
 
     print("  → Generando HTML...")

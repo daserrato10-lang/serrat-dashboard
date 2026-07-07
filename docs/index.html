@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Serrat Relojes — Dashboard Instagram</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0f0f1a;color:#e0e0f0;min-height:100vh}
+  .top-bar{background:#1a1a2e;padding:18px 32px;display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #2d2d55}
+  .top-bar h1{font-size:1.3rem;font-weight:700;color:#fff}
+  .top-bar .updated{font-size:0.75rem;color:#8888aa}
+  .content{max-width:1300px;margin:0 auto;padding:24px}
+  h2{font-size:.85rem;font-weight:600;color:#9090cc;text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;margin-top:28px}
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px}
+  .kpi{background:#1a1a2e;border-radius:10px;padding:18px;border:1px solid #2a2a44;position:relative;overflow:hidden}
+  .kpi::before{content:"";position:absolute;top:0;left:0;width:4px;height:100%;background:var(--accent,#5c6bc0)}
+  .kpi .label{font-size:.7rem;color:#8888aa;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+  .kpi .value{font-size:1.8rem;font-weight:700;color:#fff;line-height:1}
+  .kpi .sub{font-size:.68rem;color:#6666aa;margin-top:4px}
+  .kpi.green{--accent:#43a047}.kpi.blue{--accent:#1e88e5}.kpi.purple{--accent:#8e24aa}
+  .kpi.orange{--accent:#fb8c00}.kpi.teal{--accent:#00897b}.kpi.pink{--accent:#e91e63}
+  .card{background:#1a1a2e;border-radius:10px;padding:22px;border:1px solid #2a2a44;margin-top:20px}
+  .table-wrap{overflow-x:auto;margin-top:14px;border-radius:10px;border:1px solid #2a2a44}
+  table{width:100%;border-collapse:collapse;font-size:.8rem}
+  thead tr{background:#16213e}
+  thead th{padding:10px 12px;text-align:left;color:#9090cc;font-weight:600;white-space:nowrap;font-size:.72rem;text-transform:uppercase;letter-spacing:.5px}
+  tbody tr{border-top:1px solid #1e1e38;transition:background .15s}
+  tbody tr:hover{background:#1e1e38}
+  tbody td{padding:9px 12px;color:#cccce0;vertical-align:middle}
+  .caption{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .num{text-align:right;font-variant-numeric:tabular-nums}
+  .center{text-align:center}
+  a{color:#7986cb;text-decoration:none}
+  a:hover{color:#aab4ff}
+  .demo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
+  .demo-box{background:#1a1a2e;border-radius:10px;padding:18px;border:1px solid #2a2a44}
+  .demo-box h3{font-size:.75rem;color:#9090cc;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+
+  /* Controls */
+  .controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
+  .ctrl-label{font-size:.72rem;color:#8888aa;text-transform:uppercase;letter-spacing:.5px;margin-right:2px}
+  .btn-group{display:flex;gap:6px;flex-wrap:wrap}
+  .btn{padding:5px 14px;border-radius:20px;border:1px solid #3a3a5c;background:transparent;
+        color:#9090cc;cursor:pointer;font-size:.75rem;transition:all .15s}
+  .btn:hover{background:#2a2a44;color:#fff}
+  .btn.active{background:#5c6bc0;border-color:#5c6bc0;color:#fff;font-weight:600}
+  .snapshot-info{font-size:.72rem;color:#555588;margin-left:auto}
+  /* Modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;
+                  display:flex;align-items:center;justify-content:center;padding:20px;
+                  opacity:0;pointer-events:none;transition:opacity .2s}
+  .modal-overlay.open{opacity:1;pointer-events:all}
+  .modal{background:#1a1a2e;border:1px solid #3a3a5c;border-radius:14px;
+          width:100%;max-width:820px;max-height:90vh;overflow-y:auto;padding:28px;
+          transform:translateY(16px);transition:transform .2s}
+  .modal-overlay.open .modal{transform:translateY(0)}
+  .modal-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+  .modal-title{font-size:1rem;font-weight:700;color:#fff;max-width:88%;line-height:1.4}
+  .modal-meta{font-size:.75rem;color:#8888aa;margin-bottom:18px}
+  .modal-close{background:none;border:none;color:#666;cursor:pointer;font-size:1.4rem;
+                line-height:1;padding:0;margin-left:8px;flex-shrink:0}
+  .modal-close:hover{color:#fff}
+  .modal-metric-btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px}
+  .modal-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:20px}
+  .modal-stat{background:#13132a;border-radius:8px;padding:12px;text-align:center}
+  .modal-stat .s-label{font-size:.65rem;color:#8888aa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+  .modal-stat .s-value{font-size:1.3rem;font-weight:700;color:#fff}
+  tbody tr.clickable{cursor:pointer}
+  tbody tr.clickable:hover td{background:#222240}
+  .tag-select{background:#13132a;border:1px solid #3a3a5c;border-radius:12px;
+              padding:3px 8px;font-size:.7rem;cursor:pointer;outline:none;
+              transition:border-color .15s;max-width:120px}
+  .tag-select:hover{background:#1e1e38}
+  .insight-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:4px}
+  .insight-box{background:#13132a;border-radius:10px;padding:18px;border:1px solid #2a2a44}
+  .insight-box h3{font-size:.72rem;color:#9090cc;text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
+  .insight-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .insight-label{font-size:.75rem;color:#cccce0;min-width:90px}
+  .insight-bar-wrap{flex:1;background:#1e1e38;border-radius:4px;height:8px;overflow:hidden}
+  .insight-bar{height:100%;border-radius:4px;transition:width .4s}
+  .insight-val{font-size:.75rem;color:#fff;font-weight:600;min-width:52px;text-align:right}
+  .insight-note{font-size:.65rem;color:#444466;margin-top:6px;text-align:center}
+  .save-tags-btn{background:#5c6bc0;border:none;color:#fff;padding:6px 16px;border-radius:20px;
+                  cursor:pointer;font-size:.75rem;display:none;margin-left:auto}
+  .save-tags-btn:hover{background:#7986cb}
+  .save-tags-wrap{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .save-tags-note{font-size:.68rem;color:#444466;display:none}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <h1>⌚ Serrat Relojes — Dashboard Instagram</h1>
+  <span class="updated">Actualizado: 06 Jul 2026, 08:11 PM</span>
+</div>
+
+<div class="content">
+
+  <h2>Cuenta</h2>
+  <div class="kpi-grid">
+    <div class="kpi green"><div class="label">Seguidores</div><div class="value">17,384</div></div>
+    <div class="kpi blue"><div class="label">Alcance total (28d)</div><div class="value">127,333</div></div>
+    <div class="kpi purple"><div class="label">Visitas de perfil (28d)</div><div class="value">8,995</div></div>
+    <div class="kpi orange"><div class="label">Clics al sitio web (28d)</div><div class="value">2,088</div></div>
+    <div class="kpi teal"><div class="label">Seguidores ganados (28d)</div><div class="value">1,762</div></div>
+    <div class="kpi pink"><div class="label">Tasa de engagement</div><div class="value">21.21%</div><div class="sub">interacciones / seguidores</div></div>
+  </div>
+
+  <h2>Interacciones (28 días)</h2>
+  <div class="kpi-grid">
+    <div class="kpi blue"><div class="label">Total interacciones</div><div class="value">3,688</div></div>
+    <div class="kpi pink"><div class="label">Likes</div><div class="value">2,783</div></div>
+    <div class="kpi purple"><div class="label">Comentarios</div><div class="value">133</div></div>
+    <div class="kpi teal"><div class="label">Compartidos</div><div class="value">165</div></div>
+    <div class="kpi orange"><div class="label">Guardados</div><div class="value">369</div></div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Alcance diario (28d)</h2>
+    <canvas id="reachChart" style="max-height:200px"></canvas>
+  </div>
+
+  <!-- RANKING POR VIDA ÚTIL -->
+  <div class="card">
+    <h2 style="margin-top:0">Ranking — vida útil <small style="font-size:.65rem;color:#555588;font-weight:400;text-transform:none;letter-spacing:0">(reach / hora desde publicación)</small></h2>
+    <div class="controls">
+      <span class="ctrl-label">Ordenar por:</span>
+      <div class="btn-group" id="metricBtns">
+        <button class="btn active" data-metric="vida_util">Vida útil</button>
+        <button class="btn" data-metric="reach">Alcance total</button>
+        <button class="btn" data-metric="likes">Likes</button>
+        <button class="btn" data-metric="saved">Guardados</button>
+      </div>
+      <span class="snapshot-info">📸 6 snapshots · desde 2026-06-29</span>
+    </div>
+    <p id="noDataMsg" style="color:#555588;font-size:.8rem;text-align:center;padding:30px 0;display:none">
+      Aún no hay posts rastreados desde 2026-06-29. 📅
+    </p>
+    <canvas id="rankingChart" style="max-height:380px"></canvas>
+  </div>
+
+  <!-- INSIGHTS POR TIPO -->
+  <h2>Insights por tipo de contenido</h2>
+  <div class="insight-grid">
+    <div class="insight-box">
+      <h3>Vida útil promedio por formato</h3>
+      <div id="insightFormat"><p style="color:#444466;font-size:.75rem">Cargando…</p></div>
+      <p class="insight-note">reach/hora · calculado con snapshots disponibles</p>
+    </div>
+    <div class="insight-box">
+      <h3>Vida útil promedio por tipo de contenido</h3>
+      <div id="insightTag"><p style="color:#444466;font-size:.75rem">Cargando…</p></div>
+      <p class="insight-note">etiqueta los posts en la tabla para ver este análisis</p>
+    </div>
+    <div class="insight-box">
+      <h3>Hora de publicación vs vida útil</h3>
+      <div id="insightHour"><p style="color:#444466;font-size:.75rem">Cargando…</p></div>
+      <p class="insight-note">mañana (&lt;12h) · tarde (12-18h) · noche (&gt;18h) hora Colombia</p>
+    </div>
+  </div>
+
+  <h2>Últimos 30 posts <small style="color:#555588;font-size:.7rem;font-weight:400">— haz clic en cualquier fila para ver su historial · cambia el tipo de contenido con el selector</small></h2>
+  <div class="save-tags-wrap">
+    <span class="save-tags-note" id="tagsNote">Cambios sin guardar — cierra y vuelve a abrir el dashboard para que los insights se actualicen</span>
+    <button class="save-tags-btn" id="saveTagsBtn" onclick="exportTags()">💾 Guardar etiquetas</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Fecha</th><th>Caption</th><th>Formato</th><th>Tipo contenido</th>
+          <th class="num">Likes</th><th class="num">Coments</th>
+          <th class="num">Alcance</th><th class="num">Guardados</th>
+          <th class="num">Compartidos</th><th class="num">Eng%</th><th>Link</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="clickable" data-pid="18152408782495873" onclick="openModal(this.dataset.pid)">
+          <td>2026-07-05<br><small style="color:#666">1d</small></td>
+          <td class="caption">ÚLTIMO DÍA PARA QUE SE LLEVEN SU RELOJ SERRAT CON DESCUENTO 🤩🤩🤩   Los esperamos en @vassarfestival en el parque el count</td>
+          <td class="center">🎞️</td>
+          <td class="center">
+            <select class="tag-select" data-pid="18152408782495873" style="border-color:#e91e63;color:#e91e63"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" selected>evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" >sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">23</td>
+          <td class="num">0</td>
+          <td class="num">385</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td class="num">6.0%</td>
+          <td class="center"><a href="https://www.instagram.com/p/Daaw3aNDgNW/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="17948406147231277" onclick="openModal(this.dataset.pid)">
+          <td>2026-07-03<br><small style="color:#666">3d</small></td>
+          <td class="caption">DÍA 3 de @vassarfestival 🔥🧡⌚️  Los esperamos con descuentos y regalos para todos !! 🤩🤩   Siempre con la mejor energía y </td>
+          <td class="center">🎞️</td>
+          <td class="center">
+            <select class="tag-select" data-pid="17948406147231277" style="border-color:#e91e63;color:#e91e63"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" selected>evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" >sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">13</td>
+          <td class="num">1</td>
+          <td class="num">548</td>
+          <td class="num">2</td>
+          <td class="num">2</td>
+          <td class="num">2.6%</td>
+          <td class="center"><a href="https://www.instagram.com/p/DaVeMbljvXF/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="18096284966259170" onclick="openModal(this.dataset.pid)">
+          <td>2026-07-03<br><small style="color:#666">3d</small></td>
+          <td class="caption">Jajaja este video no necesita ni edición 😂😂   Ya saben ! Dónde encontrarnos ! VASSAR del 1-5 de Julio   Parque el countr</td>
+          <td class="center">🎥</td>
+          <td class="center">
+            <select class="tag-select" data-pid="18096284966259170" style="border-color:#e91e63;color:#e91e63"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" selected>evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" >sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">72</td>
+          <td class="num">12</td>
+          <td class="num">1,216</td>
+          <td class="num">0</td>
+          <td class="num">17</td>
+          <td class="num">6.9%</td>
+          <td class="center"><a href="https://www.instagram.com/reel/DaT2dtPpynY/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="18125507383638720" onclick="openModal(this.dataset.pid)">
+          <td>2026-07-02<br><small style="color:#666">4d</small></td>
+          <td class="caption">SEGUIMOS CON EL DÍA DOS 🤩🤩   Aún están a tiempo de pasar por su reloj SERRAT !  Gracias a todas las personas que han pas</td>
+          <td class="center">🎞️</td>
+          <td class="center">
+            <select class="tag-select" data-pid="18125507383638720" style="border-color:#e91e63;color:#e91e63"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" selected>evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" >sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">19</td>
+          <td class="num">1</td>
+          <td class="num">567</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td class="num">3.5%</td>
+          <td class="center"><a href="https://www.instagram.com/p/DaTp0j1CZko/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="18071740646341876" onclick="openModal(this.dataset.pid)">
+          <td>2026-07-02<br><small style="color:#666">4d</small></td>
+          <td class="caption">@vassarfestival día 1!⌚️🧡  Gracias a todos los que nos visitaron el día de hoy y si no han venido aprovechen… estamos ha</td>
+          <td class="center">🎞️</td>
+          <td class="center">
+            <select class="tag-select" data-pid="18071740646341876" style="border-color:#e91e63;color:#e91e63"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" selected>evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" >sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">37</td>
+          <td class="num">0</td>
+          <td class="num">706</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td class="num">5.2%</td>
+          <td class="center"><a href="https://www.instagram.com/p/DaRWhN7jg9p/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="17949203343206684" onclick="openModal(this.dataset.pid)">
+          <td>2026-07-01<br><small style="color:#666">5d</small></td>
+          <td class="caption">ES HOYY ! ES HOY !!! 🤩🤩🤩   Nuevamente es un sueño estar en @vassarfestival !!!   Pasen y nos visitan !! Estamos regaland</td>
+          <td class="center">🎞️</td>
+          <td class="center">
+            <select class="tag-select" data-pid="17949203343206684" style="border-color:#e91e63;color:#e91e63"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" selected>evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" >sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">34</td>
+          <td class="num">2</td>
+          <td class="num">1,064</td>
+          <td class="num">0</td>
+          <td class="num">2</td>
+          <td class="num">3.4%</td>
+          <td class="center"><a href="https://www.instagram.com/p/DaQUfb-Dqe0/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="18000042275952613" onclick="openModal(this.dataset.pid)">
+          <td>2026-06-26<br><small style="color:#666">10d</small></td>
+          <td class="caption">YA LLEGA LA FERIA MÁS ESPERADA !!   Ya queremos verlos a todos ustedes ! 🤩🤩🤩   Si viven en en Bogotá ! Los esperamos !! </td>
+          <td class="center">🎥</td>
+          <td class="center">
+            <select class="tag-select" data-pid="18000042275952613" style="border-color:#555577;color:#555577"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" >evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" selected>sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">28</td>
+          <td class="num">0</td>
+          <td class="num">1,588</td>
+          <td class="num">2</td>
+          <td class="num">2</td>
+          <td class="num">1.8%</td>
+          <td class="center"><a href="https://www.instagram.com/reel/DaB8iL1uItw/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="18086488862121190" onclick="openModal(this.dataset.pid)">
+          <td>2026-06-25<br><small style="color:#666">11d</small></td>
+          <td class="caption">OJO !!! VAMOS A TENER TODOS LOS RELOJES CON DESCUENTOS 🤩🤩🤩   Sí, TODOS 🙊   Nos vemos en la feria VASSAR en Bogotá @vassa</td>
+          <td class="center">🎥</td>
+          <td class="center">
+            <select class="tag-select" data-pid="18086488862121190" style="border-color:#555577;color:#555577"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" >evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" selected>sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">36</td>
+          <td class="num">3</td>
+          <td class="num">1,951</td>
+          <td class="num">0</td>
+          <td class="num">6</td>
+          <td class="num">2.0%</td>
+          <td class="center"><a href="https://www.instagram.com/reel/DZ_QVfnMwzH/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="18053707136766288" onclick="openModal(this.dataset.pid)">
+          <td>2026-06-23<br><small style="color:#666">13d</small></td>
+          <td class="caption">Si aún no estás convencido…. Te esperamos en nuestro stand en @vassarfestival … por ser una edición especial tendremos d</td>
+          <td class="center">🎞️</td>
+          <td class="center">
+            <select class="tag-select" data-pid="18053707136766288" style="border-color:#555577;color:#555577"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" >evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" selected>sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">18</td>
+          <td class="num">0</td>
+          <td class="num">1,358</td>
+          <td class="num">3</td>
+          <td class="num">0</td>
+          <td class="num">1.3%</td>
+          <td class="center"><a href="https://www.instagram.com/p/DZ8hbPkiZP_/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="17984302880840584" onclick="openModal(this.dataset.pid)">
+          <td>2026-06-23<br><small style="color:#666">13d</small></td>
+          <td class="caption">QUE ES SERRAT RELOJES ??? 🤨   #relojes #emprendimiento #moda #lifestyle</td>
+          <td class="center">🎥</td>
+          <td class="center">
+            <select class="tag-select" data-pid="17984302880840584" style="border-color:#555577;color:#555577"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" >evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" selected>sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">44</td>
+          <td class="num">3</td>
+          <td class="num">2,071</td>
+          <td class="num">7</td>
+          <td class="num">3</td>
+          <td class="num">2.3%</td>
+          <td class="center"><a href="https://www.instagram.com/reel/DZ6Fow3Jfzx/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="18085286948454629" onclick="openModal(this.dataset.pid)">
+          <td>2026-06-18<br><small style="color:#666">18d</small></td>
+          <td class="caption">Simplemente SERRAT😮‍💨  Medimos el tiempo en los momentos importantes y en tu día a día⌚️🧡  Si aún no tienes el tuyo… qué</td>
+          <td class="center">🎞️</td>
+          <td class="center">
+            <select class="tag-select" data-pid="18085286948454629" style="border-color:#555577;color:#555577"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" >evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" selected>sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">26</td>
+          <td class="num">1</td>
+          <td class="num">1,664</td>
+          <td class="num">2</td>
+          <td class="num">0</td>
+          <td class="num">1.6%</td>
+          <td class="center"><a href="https://www.instagram.com/p/DZvxZEkCTch/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="18377075095166493" onclick="openModal(this.dataset.pid)">
+          <td>2026-06-13<br><small style="color:#666">23d</small></td>
+          <td class="caption">Si tienes curiosidad de como se ven puestos nuestros relojes… desliza 👀  Sin duda son el complemento perfecto para cualq</td>
+          <td class="center">🎞️</td>
+          <td class="center">
+            <select class="tag-select" data-pid="18377075095166493" style="border-color:#555577;color:#555577"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" >evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" selected>sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">42</td>
+          <td class="num">1</td>
+          <td class="num">2,401</td>
+          <td class="num">5</td>
+          <td class="num">4</td>
+          <td class="num">1.8%</td>
+          <td class="center"><a href="https://www.instagram.com/p/DZixjKpCU19/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="18039251168799574" onclick="openModal(this.dataset.pid)">
+          <td>2026-06-12<br><small style="color:#666">24d</small></td>
+          <td class="caption">Taaaan raaroooooo 😅😅   Para que le compres el regalo a tu papá !! Acuérdate que es día del padre ! 🔥   Si no estás en Bo</td>
+          <td class="center">🎥</td>
+          <td class="center">
+            <select class="tag-select" data-pid="18039251168799574" style="border-color:#555577;color:#555577"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" >evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" selected>sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">12</td>
+          <td class="num">0</td>
+          <td class="num">2,103</td>
+          <td class="num">1</td>
+          <td class="num">0</td>
+          <td class="num">0.6%</td>
+          <td class="center"><a href="https://www.instagram.com/reel/DZgNAacpEK8/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="17977470585032524" onclick="openModal(this.dataset.pid)">
+          <td>2026-06-12<br><small style="color:#666">24d</small></td>
+          <td class="caption">ENVÍASELO A TU NOVIA !   Con eso ella ya va a saber cuál regalarte 😁   Y si quieres conocer más de nosotros ! Puedes ir </td>
+          <td class="center">🎥</td>
+          <td class="center">
+            <select class="tag-select" data-pid="17977470585032524" style="border-color:#555577;color:#555577"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" >evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" selected>sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">35</td>
+          <td class="num">0</td>
+          <td class="num">2,304</td>
+          <td class="num">6</td>
+          <td class="num">2</td>
+          <td class="num">1.5%</td>
+          <td class="center"><a href="https://www.instagram.com/reel/DZdyq-ep0zN/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="17902335564284795" onclick="openModal(this.dataset.pid)">
+          <td>2026-06-11<br><small style="color:#666">25d</small></td>
+          <td class="caption">Tiene que nacer acá 🇨🇴 pa meterle así de rico🔥  Este reloj es tan lindo que no necesitamos decir nada aquí 🤷🏽‍♂️  Si qui</td>
+          <td class="center">🎞️</td>
+          <td class="center">
+            <select class="tag-select" data-pid="17902335564284795" style="border-color:#555577;color:#555577"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" >evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" selected>sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">116</td>
+          <td class="num">12</td>
+          <td class="num">3,439</td>
+          <td class="num">11</td>
+          <td class="num">14</td>
+          <td class="num">3.7%</td>
+          <td class="center"><a href="https://www.instagram.com/p/DZbcd9Djp_C/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="18085757342296435" onclick="openModal(this.dataset.pid)">
+          <td>2026-06-09<br><small style="color:#666">27d</small></td>
+          <td class="caption">Envíaselo tú ya sabes a quien !!   Porque siempre hay que trabajar con estilo y para todas las profesiones hay un reloj </td>
+          <td class="center">🎥</td>
+          <td class="center">
+            <select class="tag-select" data-pid="18085757342296435" style="border-color:#555577;color:#555577"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" >evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" selected>sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">124</td>
+          <td class="num">19</td>
+          <td class="num">2,591</td>
+          <td class="num">24</td>
+          <td class="num">5</td>
+          <td class="num">5.5%</td>
+          <td class="center"><a href="https://www.instagram.com/reel/DZYkMd5JVUN/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="18128342584610153" onclick="openModal(this.dataset.pid)">
+          <td>2026-06-08<br><small style="color:#666">28d</small></td>
+          <td class="caption">Será que lo lograremos ? Ustedes que dicen ? 😳  Hace un año empezamos esta aventura y gracias a todos ustedes porque hem</td>
+          <td class="center">🎥</td>
+          <td class="center">
+            <select class="tag-select" data-pid="18128342584610153" style="border-color:#555577;color:#555577"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" >evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" selected>sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">72</td>
+          <td class="num">0</td>
+          <td class="num">2,357</td>
+          <td class="num">2</td>
+          <td class="num">1</td>
+          <td class="num">3.1%</td>
+          <td class="center"><a href="https://www.instagram.com/reel/DZVZGDEJdip/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="18589681717043433" onclick="openModal(this.dataset.pid)">
+          <td>2026-06-06<br><small style="color:#666">30d</small></td>
+          <td class="caption">EL RELOJ DE LOS COLOMBIANOS 🇨🇴   Mucha gente nos pregunta por nuestras características !! Aquí les dejamos algunas   Si </td>
+          <td class="center">🎥</td>
+          <td class="center">
+            <select class="tag-select" data-pid="18589681717043433" style="border-color:#555577;color:#555577"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" >evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" selected>sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">37</td>
+          <td class="num">2</td>
+          <td class="num">2,609</td>
+          <td class="num">6</td>
+          <td class="num">0</td>
+          <td class="num">1.5%</td>
+          <td class="center"><a href="https://www.instagram.com/reel/DZQB7wbu86e/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="18164669227448871" onclick="openModal(this.dataset.pid)">
+          <td>2026-06-04<br><small style="color:#666">32d</small></td>
+          <td class="caption">Hombres confirmen ! 😅😅   El que es amante de los relojes entiende ! Jaja   Cada vez somos más fanáticos de los relojes !</td>
+          <td class="center">🎥</td>
+          <td class="center">
+            <select class="tag-select" data-pid="18164669227448871" style="border-color:#555577;color:#555577"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" >evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" selected>sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">114</td>
+          <td class="num">7</td>
+          <td class="num">4,097</td>
+          <td class="num">8</td>
+          <td class="num">11</td>
+          <td class="num">3.0%</td>
+          <td class="center"><a href="https://www.instagram.com/reel/DZLqXCFJGEU/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="18105194593800083" onclick="openModal(this.dataset.pid)">
+          <td>2026-06-03<br><small style="color:#666">33d</small></td>
+          <td class="caption">Les tenemos una mala noticia 😭   Y gracias a Dios hemos tenido muchos pedidos para el día del padre !   Aprovechen y com</td>
+          <td class="center">🎥</td>
+          <td class="center">
+            <select class="tag-select" data-pid="18105194593800083" style="border-color:#555577;color:#555577"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" >evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" selected>sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">47</td>
+          <td class="num">0</td>
+          <td class="num">1,977</td>
+          <td class="num">3</td>
+          <td class="num">2</td>
+          <td class="num">2.4%</td>
+          <td class="center"><a href="https://www.instagram.com/reel/DZJE_QaAvte/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="18095021312245005" onclick="openModal(this.dataset.pid)">
+          <td>2026-06-03<br><small style="color:#666">33d</small></td>
+          <td class="caption">EL MEJOR REGALO DE DÍA DEL PADRE 🤩   Si estás buscando un regalo que de verdad le guste a tu papá y que use todos los dí</td>
+          <td class="center">🎥</td>
+          <td class="center">
+            <select class="tag-select" data-pid="18095021312245005" style="border-color:#555577;color:#555577"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" >evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" selected>sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">62</td>
+          <td class="num">4</td>
+          <td class="num">2,867</td>
+          <td class="num">2</td>
+          <td class="num">4</td>
+          <td class="num">2.3%</td>
+          <td class="center"><a href="https://www.instagram.com/reel/DZGpyWrpcfM/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="18166047946440553" onclick="openModal(this.dataset.pid)">
+          <td>2026-06-01<br><small style="color:#666">35d</small></td>
+          <td class="caption">Aunque es difícil escoger uno… envíaselo para ver qué tanto te conoce 🤔  Esta es una prueba de fuego para tu pareja! 🤭  </td>
+          <td class="center">🎞️</td>
+          <td class="center">
+            <select class="tag-select" data-pid="18166047946440553" style="border-color:#555577;color:#555577"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" >evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" selected>sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">67</td>
+          <td class="num">20</td>
+          <td class="num">2,707</td>
+          <td class="num">20</td>
+          <td class="num">18</td>
+          <td class="num">3.2%</td>
+          <td class="center"><a href="https://www.instagram.com/p/DZDgjKdCbUa/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="18094007237265502" onclick="openModal(this.dataset.pid)">
+          <td>2026-05-29<br><small style="color:#666">38d</small></td>
+          <td class="caption">🚨Atención ! Esto es muy importante !   Para todas las personas que nos preguntan si tenemos punto físico ! Pues ya tenem</td>
+          <td class="center">🎥</td>
+          <td class="center">
+            <select class="tag-select" data-pid="18094007237265502" style="border-color:#555577;color:#555577"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" >evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" selected>sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">15</td>
+          <td class="num">0</td>
+          <td class="num">809</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td class="num">1.9%</td>
+          <td class="center"><a href="https://www.instagram.com/reel/DY8Gy4FJKvT/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="18105426454782065" onclick="openModal(this.dataset.pid)">
+          <td>2026-05-28<br><small style="color:#666">39d</small></td>
+          <td class="caption">Ese sí que es el verdadero marketing 😅   Esa sí es la señal divina jajaja   Si también sientes que recibiste la señal y </td>
+          <td class="center">🎥</td>
+          <td class="center">
+            <select class="tag-select" data-pid="18105426454782065" style="border-color:#555577;color:#555577"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" >evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" selected>sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">23</td>
+          <td class="num">0</td>
+          <td class="num">3,122</td>
+          <td class="num">2</td>
+          <td class="num">2</td>
+          <td class="num">0.7%</td>
+          <td class="center"><a href="https://www.instagram.com/reel/DY5nG91JKWy/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="17880068595603184" onclick="openModal(this.dataset.pid)">
+          <td>2026-05-28<br><small style="color:#666">39d</small></td>
+          <td class="caption">Envíaselo a tu novia para que te regale un reloj SERRAT 🙊  O envíaselo a tus papás !   O a quien sea per que te regalen </td>
+          <td class="center">🎞️</td>
+          <td class="center">
+            <select class="tag-select" data-pid="17880068595603184" style="border-color:#555577;color:#555577"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" >evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" selected>sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">25</td>
+          <td class="num">0</td>
+          <td class="num">2,138</td>
+          <td class="num">2</td>
+          <td class="num">1</td>
+          <td class="num">1.2%</td>
+          <td class="center"><a href="https://www.instagram.com/p/DY3Sddijl4T/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="18592311037047737" onclick="openModal(this.dataset.pid)">
+          <td>2026-05-26<br><small style="color:#666">41d</small></td>
+          <td class="caption">Una camisa se desgasta, pero un reloj es para toda la vida 👴🏼⌚️  Este día del padre si le vas a regalar algo ?   Recuerd</td>
+          <td class="center">🎥</td>
+          <td class="center">
+            <select class="tag-select" data-pid="18592311037047737" style="border-color:#555577;color:#555577"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" >evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" selected>sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">1</td>
+          <td class="num">0</td>
+          <td class="num">128</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td class="num">0.8%</td>
+          <td class="center"><a href="https://www.instagram.com/reel/DYz4K60A-B0/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="17974437099044591" onclick="openModal(this.dataset.pid)">
+          <td>2026-05-26<br><small style="color:#666">41d</small></td>
+          <td class="caption">Una camisa se desgasta, pero un reloj es para toda la vida 👴🏼⌚️  Este día del padre si le vas a regalar algo ?   Recuerd</td>
+          <td class="center">🎥</td>
+          <td class="center">
+            <select class="tag-select" data-pid="17974437099044591" style="border-color:#555577;color:#555577"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" >evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" selected>sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td class="num">22</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td class="num">0.0%</td>
+          <td class="center"><a href="https://www.instagram.com/reel/DYz37ovgI-z/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="18125053114724401" onclick="openModal(this.dataset.pid)">
+          <td>2026-05-26<br><small style="color:#666">41d</small></td>
+          <td class="caption">Una camisa se desgasta, pero un reloj es para toda la vida 👴🏼⌚️  Este día del padre si le vas a regalar algo ?   Recuerd</td>
+          <td class="center">🎥</td>
+          <td class="center">
+            <select class="tag-select" data-pid="18125053114724401" style="border-color:#555577;color:#555577"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" >evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" selected>sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td class="num">113</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td class="num">0.0%</td>
+          <td class="center"><a href="https://www.instagram.com/reel/DYz3w13AkWl/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="18077893769345895" onclick="openModal(this.dataset.pid)">
+          <td>2026-05-26<br><small style="color:#666">41d</small></td>
+          <td class="caption">Una camisa se desgasta, pero un reloj es para toda la vida 👴🏼⌚️  Este día del padre si le vas a regalar algo ?   Recuerd</td>
+          <td class="center">🎥</td>
+          <td class="center">
+            <select class="tag-select" data-pid="18077893769345895" style="border-color:#555577;color:#555577"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" >evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" selected>sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td class="num">110</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td class="num">0.0%</td>
+          <td class="center"><a href="https://www.instagram.com/reel/DYz3cuAgcZ7/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr>
+        <tr class="clickable" data-pid="17899695972444787" onclick="openModal(this.dataset.pid)">
+          <td>2026-05-26<br><small style="color:#666">41d</small></td>
+          <td class="caption">Una camisa se desgasta, pero un reloj es para toda la vida 👴🏼⌚️  Este día del padre si le vas a regalar algo ?   Recuerd</td>
+          <td class="center">🎥</td>
+          <td class="center">
+            <select class="tag-select" data-pid="17899695972444787" style="border-color:#555577;color:#555577"
+                    onclick="event.stopPropagation()" onchange="saveTag(this)">
+              <option value="evento" >evento</option><option value="producto" >producto</option><option value="lifestyle" >lifestyle</option><option value="comunidad" >comunidad</option><option value="sin etiquetar" selected>sin etiquetar</option>
+            </select>
+          </td>
+          <td class="num">1</td>
+          <td class="num">0</td>
+          <td class="num">130</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td class="num">0.8%</td>
+          <td class="center"><a href="https://www.instagram.com/reel/DYz3P8dgUgk/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
+        </tr></tbody>
+    </table>
+  </div>
+
+<!-- Modal detalle de post -->
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle"></div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-meta" id="modalMeta"></div>
+    <div class="modal-stats" id="modalStats"></div>
+    <div class="modal-metric-btns" id="modalMetricBtns">
+      <span style="font-size:.7rem;color:#8888aa;align-self:center;margin-right:4px">VER:</span>
+      <button class="btn active" data-m="vida_util">Vida útil</button>
+      <button class="btn" data-m="reach">Alcance</button>
+      <button class="btn" data-m="likes">Likes</button>
+      <button class="btn" data-m="saved">Guardados</button>
+    </div>
+    <canvas id="modalChart" style="max-height:280px"></canvas>
+    <p id="modalNoData" style="color:#555588;font-size:.8rem;text-align:center;padding:30px 0;display:none">
+      Aún no hay suficientes snapshots para mostrar la curva de este post. Vuelve mañana. 📅
+    </p>
+  </div>
+</div>
+
+  <h2>Audiencia</h2>
+  <div class="demo-grid">
+    <div class="demo-box">
+      <h3>Edad y género</h3>
+      <div class="table-wrap" style="border:none">
+        <table><tbody><tr><td>25-34 / M</td><td class="num">5,086</td></tr><tr><td>35-44 / M</td><td class="num">4,378</td></tr><tr><td>45-54 / M</td><td class="num">1,602</td></tr><tr><td>25-34 / F</td><td class="num">1,531</td></tr><tr><td>35-44 / F</td><td class="num">1,144</td></tr><tr><td>18-24 / M</td><td class="num">876</td></tr><tr><td>25-34 / U</td><td class="num">460</td></tr><tr><td>35-44 / U</td><td class="num">418</td></tr><tr><td>45-54 / F</td><td class="num">342</td></tr><tr><td>55-64 / M</td><td class="num">274</td></tr><tr><td>18-24 / F</td><td class="num">176</td></tr><tr><td>45-54 / U</td><td class="num">175</td></tr></tbody></table>
+      </div>
+    </div>
+    <div class="demo-box">
+      <h3>Top países</h3>
+      <div class="table-wrap" style="border:none">
+        <table><tbody><tr><td>CO</td><td class="num">15,797</td></tr><tr><td>US</td><td class="num">177</td></tr><tr><td>VE</td><td class="num">171</td></tr><tr><td>CL</td><td class="num">103</td></tr><tr><td>MX</td><td class="num">90</td></tr><tr><td>ES</td><td class="num">84</td></tr><tr><td>AR</td><td class="num">59</td></tr><tr><td>CA</td><td class="num">34</td></tr><tr><td>DO</td><td class="num">30</td></tr><tr><td>PA</td><td class="num">28</td></tr></tbody></table>
+      </div>
+    </div>
+    <div class="demo-box">
+      <h3>Top ciudades</h3>
+      <div class="table-wrap" style="border:none">
+        <table><tbody><tr><td>Bogotá, Distrito Especial</td><td class="num">4,138</td></tr><tr><td>Medellín, Antioquia</td><td class="num">1,003</td></tr><tr><td>Barranquilla, Atlantico</td><td class="num">859</td></tr><tr><td>Santiago de Cali, Valle del Cauca</td><td class="num">751</td></tr><tr><td>Cartagena, Bolivar</td><td class="num">680</td></tr><tr><td>Bucaramanga, Santander</td><td class="num">512</td></tr><tr><td>Bello, Antioquia</td><td class="num">248</td></tr><tr><td>Floridablanca, Santander</td><td class="num">237</td></tr><tr><td>Ibagué, Tolima</td><td class="num">209</td></tr><tr><td>Villavicencio, Meta</td><td class="num">203</td></tr></tbody></table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── Alcance diario ───────────────────────────────────────────
+new Chart(document.getElementById("reachChart").getContext("2d"), {
+  type: "bar",
+  data: {
+    labels: ["2026-06-09", "2026-06-10", "2026-06-11", "2026-06-12", "2026-06-13", "2026-06-14", "2026-06-15", "2026-06-16", "2026-06-17", "2026-06-18", "2026-06-19", "2026-06-20", "2026-06-21", "2026-06-22", "2026-06-23", "2026-06-24", "2026-06-25", "2026-06-26", "2026-06-27", "2026-06-28", "2026-06-29", "2026-06-30", "2026-07-01", "2026-07-02", "2026-07-03", "2026-07-04", "2026-07-05", "2026-07-06"],
+    datasets: [{
+      label: "Alcance",
+      data: [5263, 6110, 4211, 3221, 3648, 3880, 3136, 2504, 3063, 3471, 3624, 4425, 5928, 4664, 4165, 4227, 5754, 5487, 5490, 5824, 6117, 5685, 6001, 5930, 3618, 3726, 4785, 3376],
+      backgroundColor: "rgba(92,107,192,0.7)",
+      borderColor: "#5c6bc0",
+      borderWidth: 1,
+      borderRadius: 4
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { color: "#8888aa", maxTicksLimit: 14 }, grid: { color: "#1e1e38" } },
+      y: { ticks: { color: "#8888aa" }, grid: { color: "#1e1e38" } }
+    }
+  }
+});
+
+// ── Ranking por vida útil ────────────────────────────────────
+const GROWTH_POSTS  = [{"id": "18152408782495873", "caption": "ÚLTIMO DÍA PARA QUE SE LLEVEN SU RELOJ SERRAT CON DESCUENTO 🤩🤩🤩   Los esperamos en @vassarfestival en el parque el count", "type": "CAROUSEL_ALBUM", "permalink": "https://www.instagram.com/p/Daaw3aNDgNW/", "published": "2026-07-05", "published_at": "2026-07-05T16:38:11+0000", "series": [{"snapshot_date": "2026-07-06", "hours": 30.0, "reach": 369, "likes": 20, "comments": 0, "saved": 0, "shares": 0}], "tag": "evento", "vida_util": 12.3, "vu_series": [{"hours": 30.0, "vu": 12.3}]}, {"id": "17948406147231277", "caption": "DÍA 3 de @vassarfestival 🔥🧡⌚️  Los esperamos con descuentos y regalos para todos !! 🤩🤩   Siempre con la mejor energía y ", "type": "CAROUSEL_ALBUM", "permalink": "https://www.instagram.com/p/DaVeMbljvXF/", "published": "2026-07-03", "published_at": "2026-07-03T15:18:50+0000", "series": [{"snapshot_date": "2026-07-05", "hours": 49.2, "reach": 356, "likes": 11, "comments": 0, "saved": 2, "shares": 0}, {"snapshot_date": "2026-07-06", "hours": 79.3, "reach": 534, "likes": 13, "comments": 0, "saved": 2, "shares": 2}], "tag": "evento", "vida_util": 6.73, "vu_series": [{"hours": 49.2, "vu": 7.24}, {"hours": 79.3, "vu": 6.73}]}, {"id": "18096284966259170", "caption": "Jajaja este video no necesita ni edición 😂😂   Ya saben ! Dónde encontrarnos ! VASSAR del 1-5 de Julio   Parque el countr", "type": "VIDEO", "permalink": "https://www.instagram.com/reel/DaT2dtPpynY/", "published": "2026-07-03", "published_at": "2026-07-03T00:14:30+0000", "series": [{"snapshot_date": "2026-07-05", "hours": 64.3, "reach": 1031, "likes": 66, "comments": 12, "saved": 0, "shares": 17}, {"snapshot_date": "2026-07-06", "hours": 94.4, "reach": 1200, "likes": 71, "comments": 12, "saved": 0, "shares": 17}], "tag": "evento", "vida_util": 12.71, "vu_series": [{"hours": 64.3, "vu": 16.03}, {"hours": 94.4, "vu": 12.71}]}, {"id": "18125507383638720", "caption": "SEGUIMOS CON EL DÍA DOS 🤩🤩   Aún están a tiempo de pasar por su reloj SERRAT !  Gracias a todas las personas que han pas", "type": "CAROUSEL_ALBUM", "permalink": "https://www.instagram.com/p/DaTp0j1CZko/", "published": "2026-07-02", "published_at": "2026-07-02T22:21:57+0000", "series": [{"snapshot_date": "2026-07-02", "hours": 0.5, "reach": 50, "likes": 8, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-05", "hours": 66.2, "reach": 431, "likes": 18, "comments": 1, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-06", "hours": 96.2, "reach": 559, "likes": 19, "comments": 1, "saved": 0, "shares": 0}], "tag": "evento", "vida_util": 5.81, "vu_series": [{"hours": 0.5, "vu": 100.0}, {"hours": 66.2, "vu": 6.51}, {"hours": 96.2, "vu": 5.81}]}, {"id": "18071740646341876", "caption": "@vassarfestival día 1!⌚️🧡  Gracias a todos los que nos visitaron el día de hoy y si no han venido aprovechen… estamos ha", "type": "CAROUSEL_ALBUM", "permalink": "https://www.instagram.com/p/DaRWhN7jg9p/", "published": "2026-07-02", "published_at": "2026-07-02T00:54:48+0000", "series": [{"snapshot_date": "2026-07-01", "hours": 3.5, "reach": 202, "likes": 17, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-02", "hours": 22.0, "reach": 335, "likes": 29, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-05", "hours": 87.6, "reach": 580, "likes": 32, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-06", "hours": 117.7, "reach": 696, "likes": 35, "comments": 0, "saved": 0, "shares": 0}], "tag": "evento", "vida_util": 5.91, "vu_series": [{"hours": 3.5, "vu": 57.71}, {"hours": 22.0, "vu": 15.23}, {"hours": 87.6, "vu": 6.62}, {"hours": 117.7, "vu": 5.91}]}, {"id": "17949203343206684", "caption": "ES HOYY ! ES HOY !!! 🤩🤩🤩   Nuevamente es un sueño estar en @vassarfestival !!!   Pasen y nos visitan !! Estamos regaland", "type": "CAROUSEL_ALBUM", "permalink": "https://www.instagram.com/p/DaQUfb-Dqe0/", "published": "2026-07-01", "published_at": "2026-07-01T15:17:51+0000", "series": [{"snapshot_date": "2026-07-01", "hours": 13.1, "reach": 646, "likes": 31, "comments": 2, "saved": 0, "shares": 2}, {"snapshot_date": "2026-07-02", "hours": 31.6, "reach": 760, "likes": 32, "comments": 2, "saved": 0, "shares": 2}, {"snapshot_date": "2026-07-05", "hours": 97.3, "reach": 966, "likes": 34, "comments": 2, "saved": 0, "shares": 2}, {"snapshot_date": "2026-07-06", "hours": 127.3, "reach": 1054, "likes": 34, "comments": 2, "saved": 0, "shares": 2}], "tag": "evento", "vida_util": 8.28, "vu_series": [{"hours": 13.1, "vu": 49.31}, {"hours": 31.6, "vu": 24.05}, {"hours": 97.3, "vu": 9.93}, {"hours": 127.3, "vu": 8.28}]}];
+const COLORS        = ["#5c6bc0", "#43a047", "#fb8c00", "#e91e63", "#00897b", "#8e24aa", "#1e88e5", "#f4511e", "#39ac73", "#c0ca33"];
+const TAG_COLORS    = {"evento": "#e91e63", "producto": "#1e88e5", "lifestyle": "#43a047", "comunidad": "#fb8c00", "sin etiquetar": "#555577"};
+const CATEGORIES    = ["evento", "producto", "lifestyle", "comunidad", "sin etiquetar"];
+const METRIC_LABELS = { vida_util:"Vida útil (reach/h)", reach:"Alcance total", likes:"Likes", saved:"Guardados" };
+
+let currentMetric = "vida_util";
+let rankingChart  = null;
+
+// Carga tags desde localStorage (sobreescribe los del HTML si existen)
+function loadLocalTags() {
+  try { return JSON.parse(localStorage.getItem("serrat_tags") || "{}"); } catch(e) { return {}; }
+}
+function mergeLocalTags(posts) {
+  const local = loadLocalTags();
+  posts.forEach(p => { if (local[p.id]) p.tag = local[p.id]; });
+}
+mergeLocalTags(GROWTH_POSTS);
+
+function shortCap(caption, len) {
+  len = len || 45;
+  return (caption||"").length > len ? (caption||"").slice(0, len) + "…" : (caption||"");
+}
+
+function getVal(p, metric) {
+  if (metric === "vida_util") return p.vida_util || 0;
+  const last = p.series[p.series.length - 1] || {};
+  return last[metric] || 0;
+}
+
+function renderRanking() {
+  const ranked = [...GROWTH_POSTS]
+    .filter(p => p.series && p.series.length > 0)
+    .sort((a, b) => getVal(b, currentMetric) - getVal(a, currentMetric));
+
+  const noData = ranked.length === 0;
+  document.getElementById("noDataMsg").style.display    = noData ? "block" : "none";
+  document.getElementById("rankingChart").style.display = noData ? "none"  : "block";
+  if (noData) { if (rankingChart) { rankingChart.destroy(); rankingChart = null; } return; }
+
+  const labels   = ranked.map(p => shortCap(p.caption || p.published, 40));
+  const values   = ranked.map(p => getVal(p, currentMetric));
+  const bgColors = ranked.map(p => (TAG_COLORS[p.tag] || "#5c6bc0") + "bb");
+  const borders  = ranked.map(p => TAG_COLORS[p.tag] || "#5c6bc0");
+  const maxVal   = Math.max(...values, 1);
+
+  const cfg = {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: bgColors,
+        borderColor: borders,
+        borderWidth: 1.5,
+        borderRadius: 5
+      }]
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "#1a1a2e", borderColor: "#3a3a5c", borderWidth: 1,
+          titleColor: "#fff", bodyColor: "#cccce0",
+          callbacks: {
+            title: items => shortCap(ranked[items[0].dataIndex].caption, 65),
+            label: item => {
+              const p = ranked[item.dataIndex];
+              const last = p.series[p.series.length-1] || {};
+              if (currentMetric === "vida_util")
+                return ` Vida útil: ${item.parsed.x.toFixed(1)} reach/h · ${Math.round(last.hours||0)}h de vida`;
+              return ` ${METRIC_LABELS[currentMetric]}: ${item.parsed.x.toLocaleString("es-CO")}`;
+            },
+            afterLabel: item => ` Tipo: ${ranked[item.dataIndex].tag || "sin etiquetar"}`
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: "#8888aa" }, grid: { color: "#1e1e38" }, max: maxVal * 1.12 },
+        y: { ticks: { color: "#ddddf0", font: { size: 11, cursor:"pointer" } }, grid: { color: "#1e1e38" } }
+      },
+      onClick: (evt, elements) => {
+        if (elements.length > 0) {
+          const idx = elements[0].index;
+          openModal(ranked[idx].id);
+        }
+      },
+      onHover: (evt, elements) => {
+        evt.native.target.style.cursor = elements.length > 0 ? "pointer" : "default";
+      }
+    }
+  };
+
+  if (rankingChart) rankingChart.destroy();
+  rankingChart = new Chart(document.getElementById("rankingChart").getContext("2d"), cfg);
+}
+
+document.querySelectorAll("#metricBtns .btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("#metricBtns .btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentMetric = btn.dataset.metric;
+    renderRanking();
+  });
+});
+
+renderRanking();
+
+// ── Tags inline ──────────────────────────────────────────────
+function saveTag(sel) {
+  const pid = sel.dataset.pid;
+  const tag = sel.value;
+  const color = TAG_COLORS[tag] || "#555577";
+  sel.style.borderColor = color;
+  sel.style.color = color;
+
+  const local = loadLocalTags();
+  local[pid] = tag;
+  localStorage.setItem("serrat_tags", JSON.stringify(local));
+
+  // Actualizar GROWTH_POSTS en memoria para que los insights se actualicen
+  GROWTH_POSTS.forEach(p => { if (p.id === pid) p.tag = tag; });
+  renderRanking();
+  renderInsights();
+
+  document.getElementById("saveTagsBtn").style.display = "inline-block";
+  document.getElementById("tagsNote").style.display = "inline";
+}
+
+function exportTags() {
+  const local = loadLocalTags();
+  const json = JSON.stringify(local, null, 2);
+  navigator.clipboard.writeText(json).then(() => {
+    document.getElementById("saveTagsBtn").textContent = "✅ Copiado al portapapeles";
+    setTimeout(() => { document.getElementById("saveTagsBtn").textContent = "💾 Guardar etiquetas"; }, 2500);
+  });
+}
+
+// Aplicar tags del localStorage a los selects de la tabla
+(function applyLocalTagsToSelects() {
+  const local = loadLocalTags();
+  document.querySelectorAll(".tag-select").forEach(sel => {
+    const pid = sel.dataset.pid;
+    if (local[pid]) {
+      sel.value = local[pid];
+      const color = TAG_COLORS[local[pid]] || "#555577";
+      sel.style.borderColor = color;
+      sel.style.color = color;
+    }
+  });
+})();
+
+// ── Insights por tipo ────────────────────────────────────────
+const ALL_POSTS_VU = [{"id": "18152408782495873", "caption": "ÚLTIMO DÍA PARA QUE SE LLEVEN SU RELOJ SERRAT CON DESCUENTO 🤩🤩🤩   Los esperamos en @vassarfestival en el parque el count", "type": "CAROUSEL_ALBUM", "permalink": "https://www.instagram.com/p/Daaw3aNDgNW/", "published": "2026-07-05", "published_at": "2026-07-05T16:38:11+0000", "series": [{"snapshot_date": "2026-07-06", "hours": 30.0, "reach": 369, "likes": 20, "comments": 0, "saved": 0, "shares": 0}], "tag": "evento", "vida_util": 12.3, "vu_series": [{"hours": 30.0, "vu": 12.3}]}, {"id": "17948406147231277", "caption": "DÍA 3 de @vassarfestival 🔥🧡⌚️  Los esperamos con descuentos y regalos para todos !! 🤩🤩   Siempre con la mejor energía y ", "type": "CAROUSEL_ALBUM", "permalink": "https://www.instagram.com/p/DaVeMbljvXF/", "published": "2026-07-03", "published_at": "2026-07-03T15:18:50+0000", "series": [{"snapshot_date": "2026-07-05", "hours": 49.2, "reach": 356, "likes": 11, "comments": 0, "saved": 2, "shares": 0}, {"snapshot_date": "2026-07-06", "hours": 79.3, "reach": 534, "likes": 13, "comments": 0, "saved": 2, "shares": 2}], "tag": "evento", "vida_util": 6.73, "vu_series": [{"hours": 49.2, "vu": 7.24}, {"hours": 79.3, "vu": 6.73}]}, {"id": "18096284966259170", "caption": "Jajaja este video no necesita ni edición 😂😂   Ya saben ! Dónde encontrarnos ! VASSAR del 1-5 de Julio   Parque el countr", "type": "VIDEO", "permalink": "https://www.instagram.com/reel/DaT2dtPpynY/", "published": "2026-07-03", "published_at": "2026-07-03T00:14:30+0000", "series": [{"snapshot_date": "2026-07-05", "hours": 64.3, "reach": 1031, "likes": 66, "comments": 12, "saved": 0, "shares": 17}, {"snapshot_date": "2026-07-06", "hours": 94.4, "reach": 1200, "likes": 71, "comments": 12, "saved": 0, "shares": 17}], "tag": "evento", "vida_util": 12.71, "vu_series": [{"hours": 64.3, "vu": 16.03}, {"hours": 94.4, "vu": 12.71}]}, {"id": "18125507383638720", "caption": "SEGUIMOS CON EL DÍA DOS 🤩🤩   Aún están a tiempo de pasar por su reloj SERRAT !  Gracias a todas las personas que han pas", "type": "CAROUSEL_ALBUM", "permalink": "https://www.instagram.com/p/DaTp0j1CZko/", "published": "2026-07-02", "published_at": "2026-07-02T22:21:57+0000", "series": [{"snapshot_date": "2026-07-02", "hours": 0.5, "reach": 50, "likes": 8, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-05", "hours": 66.2, "reach": 431, "likes": 18, "comments": 1, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-06", "hours": 96.2, "reach": 559, "likes": 19, "comments": 1, "saved": 0, "shares": 0}], "tag": "evento", "vida_util": 5.81, "vu_series": [{"hours": 0.5, "vu": 100.0}, {"hours": 66.2, "vu": 6.51}, {"hours": 96.2, "vu": 5.81}]}, {"id": "18071740646341876", "caption": "@vassarfestival día 1!⌚️🧡  Gracias a todos los que nos visitaron el día de hoy y si no han venido aprovechen… estamos ha", "type": "CAROUSEL_ALBUM", "permalink": "https://www.instagram.com/p/DaRWhN7jg9p/", "published": "2026-07-02", "published_at": "2026-07-02T00:54:48+0000", "series": [{"snapshot_date": "2026-07-01", "hours": 3.5, "reach": 202, "likes": 17, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-02", "hours": 22.0, "reach": 335, "likes": 29, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-05", "hours": 87.6, "reach": 580, "likes": 32, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-06", "hours": 117.7, "reach": 696, "likes": 35, "comments": 0, "saved": 0, "shares": 0}], "tag": "evento", "vida_util": 5.91, "vu_series": [{"hours": 3.5, "vu": 57.71}, {"hours": 22.0, "vu": 15.23}, {"hours": 87.6, "vu": 6.62}, {"hours": 117.7, "vu": 5.91}]}, {"id": "17949203343206684", "caption": "ES HOYY ! ES HOY !!! 🤩🤩🤩   Nuevamente es un sueño estar en @vassarfestival !!!   Pasen y nos visitan !! Estamos regaland", "type": "CAROUSEL_ALBUM", "permalink": "https://www.instagram.com/p/DaQUfb-Dqe0/", "published": "2026-07-01", "published_at": "2026-07-01T15:17:51+0000", "series": [{"snapshot_date": "2026-07-01", "hours": 13.1, "reach": 646, "likes": 31, "comments": 2, "saved": 0, "shares": 2}, {"snapshot_date": "2026-07-02", "hours": 31.6, "reach": 760, "likes": 32, "comments": 2, "saved": 0, "shares": 2}, {"snapshot_date": "2026-07-05", "hours": 97.3, "reach": 966, "likes": 34, "comments": 2, "saved": 0, "shares": 2}, {"snapshot_date": "2026-07-06", "hours": 127.3, "reach": 1054, "likes": 34, "comments": 2, "saved": 0, "shares": 2}], "tag": "evento", "vida_util": 8.28, "vu_series": [{"hours": 13.1, "vu": 49.31}, {"hours": 31.6, "vu": 24.05}, {"hours": 97.3, "vu": 9.93}, {"hours": 127.3, "vu": 8.28}]}, {"id": "18000042275952613", "caption": "YA LLEGA LA FERIA MÁS ESPERADA !!   Ya queremos verlos a todos ustedes ! 🤩🤩🤩   Si viven en en Bogotá ! Los esperamos !! ", "type": "VIDEO", "permalink": "https://www.instagram.com/reel/DaB8iL1uItw/", "published": "2026-06-26", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 72, "reach": 1016, "likes": 24, "comments": 0, "saved": 2, "shares": 2}, {"snapshot_date": "2026-06-30", "hours": 96, "reach": 1076, "likes": 25, "comments": 0, "saved": 2, "shares": 2}, {"snapshot_date": "2026-07-01", "hours": 147.1, "reach": 1243, "likes": 26, "comments": 0, "saved": 2, "shares": 2}, {"snapshot_date": "2026-07-02", "hours": 165.6, "reach": 1311, "likes": 26, "comments": 0, "saved": 2, "shares": 2}, {"snapshot_date": "2026-07-05", "hours": 231.2, "reach": 1499, "likes": 27, "comments": 0, "saved": 2, "shares": 2}, {"snapshot_date": "2026-07-06", "hours": 261.3, "reach": 1580, "likes": 27, "comments": 0, "saved": 2, "shares": 2}], "tag": "sin etiquetar", "vida_util": 6.05, "vu_series": [{"hours": 72, "vu": 14.11}, {"hours": 96, "vu": 11.21}, {"hours": 147.1, "vu": 8.45}, {"hours": 165.6, "vu": 7.92}, {"hours": 231.2, "vu": 6.48}, {"hours": 261.3, "vu": 6.05}]}, {"id": "18086488862121190", "caption": "OJO !!! VAMOS A TENER TODOS LOS RELOJES CON DESCUENTOS 🤩🤩🤩   Sí, TODOS 🙊   Nos vemos en la feria VASSAR en Bogotá @vassa", "type": "VIDEO", "permalink": "https://www.instagram.com/reel/DZ_QVfnMwzH/", "published": "2026-06-25", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 96, "reach": 1339, "likes": 29, "comments": 3, "saved": 0, "shares": 6}, {"snapshot_date": "2026-06-30", "hours": 120, "reach": 1436, "likes": 30, "comments": 3, "saved": 0, "shares": 6}, {"snapshot_date": "2026-07-01", "hours": 172.2, "reach": 1609, "likes": 32, "comments": 3, "saved": 0, "shares": 6}, {"snapshot_date": "2026-07-02", "hours": 190.6, "reach": 1674, "likes": 32, "comments": 3, "saved": 0, "shares": 6}, {"snapshot_date": "2026-07-05", "hours": 256.3, "reach": 1862, "likes": 34, "comments": 3, "saved": 0, "shares": 6}, {"snapshot_date": "2026-07-06", "hours": 286.3, "reach": 1941, "likes": 36, "comments": 3, "saved": 0, "shares": 6}], "tag": "sin etiquetar", "vida_util": 6.78, "vu_series": [{"hours": 96, "vu": 13.95}, {"hours": 120, "vu": 11.97}, {"hours": 172.2, "vu": 9.34}, {"hours": 190.6, "vu": 8.78}, {"hours": 256.3, "vu": 7.26}, {"hours": 286.3, "vu": 6.78}]}, {"id": "18053707136766288", "caption": "Si aún no estás convencido…. Te esperamos en nuestro stand en @vassarfestival … por ser una edición especial tendremos d", "type": "CAROUSEL_ALBUM", "permalink": "https://www.instagram.com/p/DZ8hbPkiZP_/", "published": "2026-06-23", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 144, "reach": 807, "likes": 16, "comments": 0, "saved": 2, "shares": 0}, {"snapshot_date": "2026-06-30", "hours": 168, "reach": 869, "likes": 17, "comments": 0, "saved": 2, "shares": 0}, {"snapshot_date": "2026-07-01", "hours": 197.7, "reach": 1048, "likes": 18, "comments": 0, "saved": 2, "shares": 0}, {"snapshot_date": "2026-07-02", "hours": 216.1, "reach": 1103, "likes": 18, "comments": 0, "saved": 2, "shares": 0}, {"snapshot_date": "2026-07-05", "hours": 281.8, "reach": 1279, "likes": 18, "comments": 0, "saved": 3, "shares": 0}, {"snapshot_date": "2026-07-06", "hours": 311.8, "reach": 1353, "likes": 18, "comments": 0, "saved": 3, "shares": 0}], "tag": "sin etiquetar", "vida_util": 4.34, "vu_series": [{"hours": 144, "vu": 5.6}, {"hours": 168, "vu": 5.17}, {"hours": 197.7, "vu": 5.3}, {"hours": 216.1, "vu": 5.1}, {"hours": 281.8, "vu": 4.54}, {"hours": 311.8, "vu": 4.34}]}, {"id": "17984302880840584", "caption": "QUE ES SERRAT RELOJES ??? 🤨   #relojes #emprendimiento #moda #lifestyle", "type": "VIDEO", "permalink": "https://www.instagram.com/reel/DZ6Fow3Jfzx/", "published": "2026-06-23", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 144, "reach": 1458, "likes": 30, "comments": 0, "saved": 4, "shares": 3}, {"snapshot_date": "2026-06-30", "hours": 168, "reach": 1524, "likes": 31, "comments": 0, "saved": 5, "shares": 3}, {"snapshot_date": "2026-07-01", "hours": 220.3, "reach": 1728, "likes": 37, "comments": 0, "saved": 5, "shares": 3}, {"snapshot_date": "2026-07-02", "hours": 238.8, "reach": 1787, "likes": 39, "comments": 0, "saved": 6, "shares": 3}, {"snapshot_date": "2026-07-05", "hours": 304.5, "reach": 1969, "likes": 43, "comments": 1, "saved": 7, "shares": 3}, {"snapshot_date": "2026-07-06", "hours": 334.5, "reach": 2060, "likes": 44, "comments": 1, "saved": 7, "shares": 3}], "tag": "sin etiquetar", "vida_util": 6.16, "vu_series": [{"hours": 144, "vu": 10.12}, {"hours": 168, "vu": 9.07}, {"hours": 220.3, "vu": 7.84}, {"hours": 238.8, "vu": 7.48}, {"hours": 304.5, "vu": 6.47}, {"hours": 334.5, "vu": 6.16}]}, {"id": "18085286948454629", "caption": "Simplemente SERRAT😮‍💨  Medimos el tiempo en los momentos importantes y en tu día a día⌚️🧡  Si aún no tienes el tuyo… qué", "type": "CAROUSEL_ALBUM", "permalink": "https://www.instagram.com/p/DZvxZEkCTch/", "published": "2026-06-18", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 264, "reach": 1243, "likes": 23, "comments": 1, "saved": 1, "shares": 0}, {"snapshot_date": "2026-06-30", "hours": 288, "reach": 1295, "likes": 24, "comments": 1, "saved": 1, "shares": 0}, {"snapshot_date": "2026-07-01", "hours": 316.5, "reach": 1440, "likes": 25, "comments": 1, "saved": 1, "shares": 0}, {"snapshot_date": "2026-07-02", "hours": 335.0, "reach": 1480, "likes": 25, "comments": 1, "saved": 1, "shares": 0}, {"snapshot_date": "2026-07-05", "hours": 400.6, "reach": 1601, "likes": 26, "comments": 1, "saved": 2, "shares": 0}, {"snapshot_date": "2026-07-06", "hours": 430.7, "reach": 1659, "likes": 26, "comments": 1, "saved": 2, "shares": 0}], "tag": "sin etiquetar", "vida_util": 3.85, "vu_series": [{"hours": 264, "vu": 4.71}, {"hours": 288, "vu": 4.5}, {"hours": 316.5, "vu": 4.55}, {"hours": 335.0, "vu": 4.42}, {"hours": 400.6, "vu": 4.0}, {"hours": 430.7, "vu": 3.85}]}, {"id": "18377075095166493", "caption": "Si tienes curiosidad de como se ven puestos nuestros relojes… desliza 👀  Sin duda son el complemento perfecto para cualq", "type": "CAROUSEL_ALBUM", "permalink": "https://www.instagram.com/p/DZixjKpCU19/", "published": "2026-06-13", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 384, "reach": 2041, "likes": 41, "comments": 1, "saved": 4, "shares": 4}, {"snapshot_date": "2026-06-30", "hours": 408, "reach": 2090, "likes": 41, "comments": 1, "saved": 5, "shares": 4}, {"snapshot_date": "2026-07-01", "hours": 437.6, "reach": 2219, "likes": 42, "comments": 1, "saved": 5, "shares": 4}, {"snapshot_date": "2026-07-02", "hours": 456.1, "reach": 2258, "likes": 42, "comments": 1, "saved": 5, "shares": 4}, {"snapshot_date": "2026-07-05", "hours": 521.8, "reach": 2366, "likes": 42, "comments": 1, "saved": 5, "shares": 4}, {"snapshot_date": "2026-07-06", "hours": 551.8, "reach": 2401, "likes": 42, "comments": 1, "saved": 5, "shares": 4}], "tag": "sin etiquetar", "vida_util": 4.35, "vu_series": [{"hours": 384, "vu": 5.32}, {"hours": 408, "vu": 5.12}, {"hours": 437.6, "vu": 5.07}, {"hours": 456.1, "vu": 4.95}, {"hours": 521.8, "vu": 4.53}, {"hours": 551.8, "vu": 4.35}]}, {"id": "18039251168799574", "caption": "Taaaan raaroooooo 😅😅   Para que le compres el regalo a tu papá !! Acuérdate que es día del padre ! 🔥   Si no estás en Bo", "type": "VIDEO", "permalink": "https://www.instagram.com/reel/DZgNAacpEK8/", "published": "2026-06-12", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 408, "reach": 1662, "likes": 10, "comments": 0, "saved": 1, "shares": 0}, {"snapshot_date": "2026-06-30", "hours": 432, "reach": 1714, "likes": 10, "comments": 0, "saved": 1, "shares": 0}, {"snapshot_date": "2026-07-01", "hours": 461.6, "reach": 1847, "likes": 11, "comments": 0, "saved": 1, "shares": 0}, {"snapshot_date": "2026-07-02", "hours": 480.1, "reach": 1892, "likes": 11, "comments": 0, "saved": 1, "shares": 0}, {"snapshot_date": "2026-07-05", "hours": 545.7, "reach": 2023, "likes": 11, "comments": 0, "saved": 1, "shares": 0}, {"snapshot_date": "2026-07-06", "hours": 575.8, "reach": 2093, "likes": 12, "comments": 0, "saved": 1, "shares": 0}], "tag": "sin etiquetar", "vida_util": 3.63, "vu_series": [{"hours": 408, "vu": 4.07}, {"hours": 432, "vu": 3.97}, {"hours": 461.6, "vu": 4.0}, {"hours": 480.1, "vu": 3.94}, {"hours": 545.7, "vu": 3.71}, {"hours": 575.8, "vu": 3.63}]}, {"id": "17977470585032524", "caption": "ENVÍASELO A TU NOVIA !   Con eso ella ya va a saber cuál regalarte 😁   Y si quieres conocer más de nosotros ! Puedes ir ", "type": "VIDEO", "permalink": "https://www.instagram.com/reel/DZdyq-ep0zN/", "published": "2026-06-12", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 408, "reach": 1880, "likes": 30, "comments": 0, "saved": 2, "shares": 2}, {"snapshot_date": "2026-06-30", "hours": 432, "reach": 1923, "likes": 31, "comments": 0, "saved": 2, "shares": 2}, {"snapshot_date": "2026-07-01", "hours": 484.1, "reach": 2060, "likes": 31, "comments": 0, "saved": 2, "shares": 2}, {"snapshot_date": "2026-07-02", "hours": 502.5, "reach": 2093, "likes": 32, "comments": 0, "saved": 2, "shares": 2}, {"snapshot_date": "2026-07-05", "hours": 568.2, "reach": 2231, "likes": 35, "comments": 0, "saved": 5, "shares": 2}, {"snapshot_date": "2026-07-06", "hours": 598.2, "reach": 2288, "likes": 35, "comments": 0, "saved": 6, "shares": 2}], "tag": "sin etiquetar", "vida_util": 3.82, "vu_series": [{"hours": 408, "vu": 4.61}, {"hours": 432, "vu": 4.45}, {"hours": 484.1, "vu": 4.26}, {"hours": 502.5, "vu": 4.17}, {"hours": 568.2, "vu": 3.93}, {"hours": 598.2, "vu": 3.82}]}, {"id": "17902335564284795", "caption": "Tiene que nacer acá 🇨🇴 pa meterle así de rico🔥  Este reloj es tan lindo que no necesitamos decir nada aquí 🤷🏽‍♂️  Si qui", "type": "CAROUSEL_ALBUM", "permalink": "https://www.instagram.com/p/DZbcd9Djp_C/", "published": "2026-06-11", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 432, "reach": 2619, "likes": 95, "comments": 12, "saved": 6, "shares": 7}, {"snapshot_date": "2026-06-30", "hours": 456, "reach": 2704, "likes": 100, "comments": 12, "saved": 6, "shares": 8}, {"snapshot_date": "2026-07-01", "hours": 506.0, "reach": 2884, "likes": 106, "comments": 12, "saved": 7, "shares": 14}, {"snapshot_date": "2026-07-02", "hours": 524.4, "reach": 2950, "likes": 107, "comments": 12, "saved": 7, "shares": 14}, {"snapshot_date": "2026-07-05", "hours": 590.1, "reach": 3289, "likes": 112, "comments": 12, "saved": 10, "shares": 14}, {"snapshot_date": "2026-07-06", "hours": 620.1, "reach": 3423, "likes": 116, "comments": 12, "saved": 11, "shares": 14}], "tag": "sin etiquetar", "vida_util": 5.52, "vu_series": [{"hours": 432, "vu": 6.06}, {"hours": 456, "vu": 5.93}, {"hours": 506.0, "vu": 5.7}, {"hours": 524.4, "vu": 5.63}, {"hours": 590.1, "vu": 5.57}, {"hours": 620.1, "vu": 5.52}]}, {"id": "18085757342296435", "caption": "Envíaselo tú ya sabes a quien !!   Porque siempre hay que trabajar con estilo y para todas las profesiones hay un reloj ", "type": "VIDEO", "permalink": "https://www.instagram.com/reel/DZYkMd5JVUN/", "published": "2026-06-09", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 480, "reach": 2246, "likes": 110, "comments": 17, "saved": 21, "shares": 5}, {"snapshot_date": "2026-06-30", "hours": 504, "reach": 2288, "likes": 113, "comments": 19, "saved": 22, "shares": 5}, {"snapshot_date": "2026-07-01", "hours": 532.8, "reach": 2395, "likes": 117, "comments": 19, "saved": 22, "shares": 5}, {"snapshot_date": "2026-07-02", "hours": 551.2, "reach": 2424, "likes": 117, "comments": 19, "saved": 22, "shares": 5}, {"snapshot_date": "2026-07-05", "hours": 616.9, "reach": 2535, "likes": 120, "comments": 19, "saved": 23, "shares": 5}, {"snapshot_date": "2026-07-06", "hours": 646.9, "reach": 2580, "likes": 122, "comments": 19, "saved": 24, "shares": 5}], "tag": "sin etiquetar", "vida_util": 3.99, "vu_series": [{"hours": 480, "vu": 4.68}, {"hours": 504, "vu": 4.54}, {"hours": 532.8, "vu": 4.5}, {"hours": 551.2, "vu": 4.4}, {"hours": 616.9, "vu": 4.11}, {"hours": 646.9, "vu": 3.99}]}, {"id": "18128342584610153", "caption": "Será que lo lograremos ? Ustedes que dicen ? 😳  Hace un año empezamos esta aventura y gracias a todos ustedes porque hem", "type": "VIDEO", "permalink": "https://www.instagram.com/reel/DZVZGDEJdip/", "published": "2026-06-08", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 504, "reach": 2077, "likes": 68, "comments": 0, "saved": 2, "shares": 1}, {"snapshot_date": "2026-06-30", "hours": 528, "reach": 2118, "likes": 70, "comments": 0, "saved": 2, "shares": 1}, {"snapshot_date": "2026-07-01", "hours": 562.4, "reach": 2204, "likes": 72, "comments": 0, "saved": 2, "shares": 1}, {"snapshot_date": "2026-07-02", "hours": 580.9, "reach": 2219, "likes": 72, "comments": 0, "saved": 2, "shares": 1}, {"snapshot_date": "2026-07-05", "hours": 646.5, "reach": 2304, "likes": 72, "comments": 0, "saved": 2, "shares": 1}, {"snapshot_date": "2026-07-06", "hours": 676.6, "reach": 2347, "likes": 72, "comments": 0, "saved": 2, "shares": 1}], "tag": "sin etiquetar", "vida_util": 3.47, "vu_series": [{"hours": 504, "vu": 4.12}, {"hours": 528, "vu": 4.01}, {"hours": 562.4, "vu": 3.92}, {"hours": 580.9, "vu": 3.82}, {"hours": 646.5, "vu": 3.56}, {"hours": 676.6, "vu": 3.47}]}, {"id": "18589681717043433", "caption": "EL RELOJ DE LOS COLOMBIANOS 🇨🇴   Mucha gente nos pregunta por nuestras características !! Aquí les dejamos algunas   Si ", "type": "VIDEO", "permalink": "https://www.instagram.com/reel/DZQB7wbu86e/", "published": "2026-06-06", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 552, "reach": 2376, "likes": 37, "comments": 2, "saved": 6, "shares": 0}, {"snapshot_date": "2026-06-30", "hours": 576, "reach": 2411, "likes": 37, "comments": 2, "saved": 6, "shares": 0}, {"snapshot_date": "2026-07-01", "hours": 612.3, "reach": 2477, "likes": 37, "comments": 2, "saved": 6, "shares": 0}, {"snapshot_date": "2026-07-02", "hours": 630.8, "reach": 2497, "likes": 37, "comments": 2, "saved": 6, "shares": 0}, {"snapshot_date": "2026-07-05", "hours": 696.5, "reach": 2573, "likes": 37, "comments": 2, "saved": 6, "shares": 0}, {"snapshot_date": "2026-07-06", "hours": 726.5, "reach": 2605, "likes": 37, "comments": 2, "saved": 6, "shares": 0}], "tag": "sin etiquetar", "vida_util": 3.59, "vu_series": [{"hours": 552, "vu": 4.3}, {"hours": 576, "vu": 4.19}, {"hours": 612.3, "vu": 4.05}, {"hours": 630.8, "vu": 3.96}, {"hours": 696.5, "vu": 3.69}, {"hours": 726.5, "vu": 3.59}]}, {"id": "18164669227448871", "caption": "Hombres confirmen ! 😅😅   El que es amante de los relojes entiende ! Jaja   Cada vez somos más fanáticos de los relojes !", "type": "VIDEO", "permalink": "https://www.instagram.com/reel/DZLqXCFJGEU/", "published": "2026-06-04", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 600, "reach": 3901, "likes": 111, "comments": 7, "saved": 8, "shares": 9}, {"snapshot_date": "2026-06-30", "hours": 624, "reach": 3921, "likes": 112, "comments": 7, "saved": 8, "shares": 9}, {"snapshot_date": "2026-07-01", "hours": 653.1, "reach": 3976, "likes": 112, "comments": 7, "saved": 8, "shares": 9}, {"snapshot_date": "2026-07-02", "hours": 671.5, "reach": 3994, "likes": 113, "comments": 7, "saved": 8, "shares": 9}, {"snapshot_date": "2026-07-05", "hours": 737.2, "reach": 4046, "likes": 113, "comments": 7, "saved": 8, "shares": 10}, {"snapshot_date": "2026-07-06", "hours": 767.2, "reach": 4097, "likes": 114, "comments": 7, "saved": 8, "shares": 11}], "tag": "sin etiquetar", "vida_util": 5.34, "vu_series": [{"hours": 600, "vu": 6.5}, {"hours": 624, "vu": 6.28}, {"hours": 653.1, "vu": 6.09}, {"hours": 671.5, "vu": 5.95}, {"hours": 737.2, "vu": 5.49}, {"hours": 767.2, "vu": 5.34}]}, {"id": "18105194593800083", "caption": "Les tenemos una mala noticia 😭   Y gracias a Dios hemos tenido muchos pedidos para el día del padre !   Aprovechen y com", "type": "VIDEO", "permalink": "https://www.instagram.com/reel/DZJE_QaAvte/", "published": "2026-06-03", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 624, "reach": 1850, "likes": 44, "comments": 0, "saved": 2, "shares": 2}, {"snapshot_date": "2026-06-30", "hours": 648, "reach": 1862, "likes": 45, "comments": 0, "saved": 2, "shares": 2}, {"snapshot_date": "2026-07-01", "hours": 677.1, "reach": 1907, "likes": 45, "comments": 0, "saved": 2, "shares": 2}, {"snapshot_date": "2026-07-02", "hours": 695.6, "reach": 1920, "likes": 46, "comments": 0, "saved": 2, "shares": 2}, {"snapshot_date": "2026-07-05", "hours": 761.3, "reach": 1956, "likes": 46, "comments": 0, "saved": 3, "shares": 2}, {"snapshot_date": "2026-07-06", "hours": 791.3, "reach": 1977, "likes": 47, "comments": 0, "saved": 3, "shares": 2}], "tag": "sin etiquetar", "vida_util": 2.5, "vu_series": [{"hours": 624, "vu": 2.96}, {"hours": 648, "vu": 2.87}, {"hours": 677.1, "vu": 2.82}, {"hours": 695.6, "vu": 2.76}, {"hours": 761.3, "vu": 2.57}, {"hours": 791.3, "vu": 2.5}]}, {"id": "18095021312245005", "caption": "EL MEJOR REGALO DE DÍA DEL PADRE 🤩   Si estás buscando un regalo que de verdad le guste a tu papá y que use todos los dí", "type": "VIDEO", "permalink": "https://www.instagram.com/reel/DZGpyWrpcfM/", "published": "2026-06-03", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 624, "reach": 2689, "likes": 61, "comments": 2, "saved": 2, "shares": 4}, {"snapshot_date": "2026-06-30", "hours": 648, "reach": 2715, "likes": 61, "comments": 2, "saved": 2, "shares": 4}, {"snapshot_date": "2026-07-01", "hours": 699.7, "reach": 2765, "likes": 61, "comments": 2, "saved": 2, "shares": 4}, {"snapshot_date": "2026-07-02", "hours": 718.2, "reach": 2784, "likes": 62, "comments": 4, "saved": 2, "shares": 4}, {"snapshot_date": "2026-07-05", "hours": 783.9, "reach": 2827, "likes": 62, "comments": 4, "saved": 2, "shares": 4}, {"snapshot_date": "2026-07-06", "hours": 813.9, "reach": 2863, "likes": 62, "comments": 4, "saved": 2, "shares": 4}], "tag": "sin etiquetar", "vida_util": 3.52, "vu_series": [{"hours": 624, "vu": 4.31}, {"hours": 648, "vu": 4.19}, {"hours": 699.7, "vu": 3.95}, {"hours": 718.2, "vu": 3.88}, {"hours": 783.9, "vu": 3.61}, {"hours": 813.9, "vu": 3.52}]}, {"id": "18166047946440553", "caption": "Aunque es difícil escoger uno… envíaselo para ver qué tanto te conoce 🤔  Esta es una prueba de fuego para tu pareja! 🤭  ", "type": "CAROUSEL_ALBUM", "permalink": "https://www.instagram.com/p/DZDgjKdCbUa/", "published": "2026-06-01", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 672, "reach": 2514, "likes": 63, "comments": 20, "saved": 20, "shares": 14}, {"snapshot_date": "2026-06-30", "hours": 696, "reach": 2538, "likes": 65, "comments": 20, "saved": 20, "shares": 14}, {"snapshot_date": "2026-07-01", "hours": 729.1, "reach": 2594, "likes": 66, "comments": 20, "saved": 20, "shares": 18}, {"snapshot_date": "2026-07-02", "hours": 747.5, "reach": 2619, "likes": 66, "comments": 20, "saved": 20, "shares": 18}, {"snapshot_date": "2026-07-05", "hours": 813.2, "reach": 2670, "likes": 67, "comments": 20, "saved": 20, "shares": 18}, {"snapshot_date": "2026-07-06", "hours": 843.2, "reach": 2707, "likes": 67, "comments": 20, "saved": 20, "shares": 18}], "tag": "sin etiquetar", "vida_util": 3.21, "vu_series": [{"hours": 672, "vu": 3.74}, {"hours": 696, "vu": 3.65}, {"hours": 729.1, "vu": 3.56}, {"hours": 747.5, "vu": 3.5}, {"hours": 813.2, "vu": 3.28}, {"hours": 843.2, "vu": 3.21}]}, {"id": "18094007237265502", "caption": "🚨Atención ! Esto es muy importante !   Para todas las personas que nos preguntan si tenemos punto físico ! Pues ya tenem", "type": "VIDEO", "permalink": "https://www.instagram.com/reel/DY8Gy4FJKvT/", "published": "2026-05-29", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 744, "reach": 789, "likes": 15, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-06-30", "hours": 768, "reach": 791, "likes": 15, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-01", "hours": 798.0, "reach": 795, "likes": 15, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-02", "hours": 816.5, "reach": 797, "likes": 15, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-05", "hours": 882.2, "reach": 803, "likes": 15, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-06", "hours": 912.2, "reach": 809, "likes": 15, "comments": 0, "saved": 0, "shares": 0}], "tag": "sin etiquetar", "vida_util": 0.89, "vu_series": [{"hours": 744, "vu": 1.06}, {"hours": 768, "vu": 1.03}, {"hours": 798.0, "vu": 1.0}, {"hours": 816.5, "vu": 0.98}, {"hours": 882.2, "vu": 0.91}, {"hours": 912.2, "vu": 0.89}]}, {"id": "18105426454782065", "caption": "Ese sí que es el verdadero marketing 😅   Esa sí es la señal divina jajaja   Si también sientes que recibiste la señal y ", "type": "VIDEO", "permalink": "https://www.instagram.com/reel/DY5nG91JKWy/", "published": "2026-05-28", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 768, "reach": 2904, "likes": 23, "comments": 0, "saved": 1, "shares": 2}, {"snapshot_date": "2026-06-30", "hours": 792, "reach": 2929, "likes": 23, "comments": 0, "saved": 1, "shares": 2}, {"snapshot_date": "2026-07-01", "hours": 821.3, "reach": 2997, "likes": 23, "comments": 0, "saved": 1, "shares": 2}, {"snapshot_date": "2026-07-02", "hours": 839.8, "reach": 3023, "likes": 23, "comments": 0, "saved": 1, "shares": 2}, {"snapshot_date": "2026-07-05", "hours": 905.4, "reach": 3081, "likes": 23, "comments": 0, "saved": 2, "shares": 2}, {"snapshot_date": "2026-07-06", "hours": 935.5, "reach": 3122, "likes": 23, "comments": 0, "saved": 2, "shares": 2}], "tag": "sin etiquetar", "vida_util": 3.34, "vu_series": [{"hours": 768, "vu": 3.78}, {"hours": 792, "vu": 3.7}, {"hours": 821.3, "vu": 3.65}, {"hours": 839.8, "vu": 3.6}, {"hours": 905.4, "vu": 3.4}, {"hours": 935.5, "vu": 3.34}]}, {"id": "17880068595603184", "caption": "Envíaselo a tu novia para que te regale un reloj SERRAT 🙊  O envíaselo a tus papás !   O a quien sea per que te regalen ", "type": "CAROUSEL_ALBUM", "permalink": "https://www.instagram.com/p/DY3Sddijl4T/", "published": "2026-05-28", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 768, "reach": 2019, "likes": 25, "comments": 0, "saved": 2, "shares": 1}, {"snapshot_date": "2026-06-30", "hours": 792, "reach": 2027, "likes": 25, "comments": 0, "saved": 2, "shares": 1}, {"snapshot_date": "2026-07-01", "hours": 843.0, "reach": 2057, "likes": 25, "comments": 0, "saved": 2, "shares": 1}, {"snapshot_date": "2026-07-02", "hours": 861.4, "reach": 2068, "likes": 25, "comments": 0, "saved": 2, "shares": 1}, {"snapshot_date": "2026-07-05", "hours": 927.1, "reach": 2113, "likes": 25, "comments": 0, "saved": 2, "shares": 1}, {"snapshot_date": "2026-07-06", "hours": 957.1, "reach": 2138, "likes": 25, "comments": 0, "saved": 2, "shares": 1}], "tag": "sin etiquetar", "vida_util": 2.23, "vu_series": [{"hours": 768, "vu": 2.63}, {"hours": 792, "vu": 2.56}, {"hours": 843.0, "vu": 2.44}, {"hours": 861.4, "vu": 2.4}, {"hours": 927.1, "vu": 2.28}, {"hours": 957.1, "vu": 2.23}]}, {"id": "18592311037047737", "caption": "Una camisa se desgasta, pero un reloj es para toda la vida 👴🏼⌚️  Este día del padre si le vas a regalar algo ?   Recuerd", "type": "VIDEO", "permalink": "https://www.instagram.com/reel/DYz4K60A-B0/", "published": "2026-05-26", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 816, "reach": 128, "likes": 1, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-06-30", "hours": 840, "reach": 128, "likes": 1, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-01", "hours": 874.7, "reach": 128, "likes": 1, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-02", "hours": 893.2, "reach": 128, "likes": 1, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-05", "hours": 958.9, "reach": 128, "likes": 1, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-06", "hours": 988.9, "reach": 128, "likes": 1, "comments": 0, "saved": 0, "shares": 0}], "tag": "sin etiquetar", "vida_util": 0.13, "vu_series": [{"hours": 816, "vu": 0.16}, {"hours": 840, "vu": 0.15}, {"hours": 874.7, "vu": 0.15}, {"hours": 893.2, "vu": 0.14}, {"hours": 958.9, "vu": 0.13}, {"hours": 988.9, "vu": 0.13}]}, {"id": "17974437099044591", "caption": "Una camisa se desgasta, pero un reloj es para toda la vida 👴🏼⌚️  Este día del padre si le vas a regalar algo ?   Recuerd", "type": "VIDEO", "permalink": "https://www.instagram.com/reel/DYz37ovgI-z/", "published": "2026-05-26", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 816, "reach": 22, "likes": 0, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-06-30", "hours": 840, "reach": 22, "likes": 0, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-01", "hours": 874.8, "reach": 22, "likes": 0, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-02", "hours": 893.3, "reach": 22, "likes": 0, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-05", "hours": 958.9, "reach": 22, "likes": 0, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-06", "hours": 989.0, "reach": 22, "likes": 0, "comments": 0, "saved": 0, "shares": 0}], "tag": "sin etiquetar", "vida_util": 0.02, "vu_series": [{"hours": 816, "vu": 0.03}, {"hours": 840, "vu": 0.03}, {"hours": 874.8, "vu": 0.03}, {"hours": 893.3, "vu": 0.02}, {"hours": 958.9, "vu": 0.02}, {"hours": 989.0, "vu": 0.02}]}, {"id": "18125053114724401", "caption": "Una camisa se desgasta, pero un reloj es para toda la vida 👴🏼⌚️  Este día del padre si le vas a regalar algo ?   Recuerd", "type": "VIDEO", "permalink": "https://www.instagram.com/reel/DYz3w13AkWl/", "published": "2026-05-26", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 816, "reach": 113, "likes": 0, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-06-30", "hours": 840, "reach": 113, "likes": 0, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-01", "hours": 874.8, "reach": 113, "likes": 0, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-02", "hours": 893.3, "reach": 113, "likes": 0, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-05", "hours": 958.9, "reach": 113, "likes": 0, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-06", "hours": 989.0, "reach": 113, "likes": 0, "comments": 0, "saved": 0, "shares": 0}], "tag": "sin etiquetar", "vida_util": 0.11, "vu_series": [{"hours": 816, "vu": 0.14}, {"hours": 840, "vu": 0.13}, {"hours": 874.8, "vu": 0.13}, {"hours": 893.3, "vu": 0.13}, {"hours": 958.9, "vu": 0.12}, {"hours": 989.0, "vu": 0.11}]}, {"id": "18077893769345895", "caption": "Una camisa se desgasta, pero un reloj es para toda la vida 👴🏼⌚️  Este día del padre si le vas a regalar algo ?   Recuerd", "type": "VIDEO", "permalink": "https://www.instagram.com/reel/DYz3cuAgcZ7/", "published": "2026-05-26", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 816, "reach": 110, "likes": 0, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-06-30", "hours": 840, "reach": 110, "likes": 0, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-01", "hours": 874.8, "reach": 110, "likes": 0, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-02", "hours": 893.3, "reach": 110, "likes": 0, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-05", "hours": 959.0, "reach": 110, "likes": 0, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-06", "hours": 989.0, "reach": 110, "likes": 0, "comments": 0, "saved": 0, "shares": 0}], "tag": "sin etiquetar", "vida_util": 0.11, "vu_series": [{"hours": 816, "vu": 0.13}, {"hours": 840, "vu": 0.13}, {"hours": 874.8, "vu": 0.13}, {"hours": 893.3, "vu": 0.12}, {"hours": 959.0, "vu": 0.11}, {"hours": 989.0, "vu": 0.11}]}, {"id": "17899695972444787", "caption": "Una camisa se desgasta, pero un reloj es para toda la vida 👴🏼⌚️  Este día del padre si le vas a regalar algo ?   Recuerd", "type": "VIDEO", "permalink": "https://www.instagram.com/reel/DYz3P8dgUgk/", "published": "2026-05-26", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 816, "reach": 130, "likes": 1, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-06-30", "hours": 840, "reach": 130, "likes": 1, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-01", "hours": 874.9, "reach": 130, "likes": 1, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-02", "hours": 893.4, "reach": 130, "likes": 1, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-05", "hours": 959.0, "reach": 130, "likes": 1, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-07-06", "hours": 989.1, "reach": 130, "likes": 1, "comments": 0, "saved": 0, "shares": 0}], "tag": "sin etiquetar", "vida_util": 0.13, "vu_series": [{"hours": 816, "vu": 0.16}, {"hours": 840, "vu": 0.15}, {"hours": 874.9, "vu": 0.15}, {"hours": 893.4, "vu": 0.15}, {"hours": 959.0, "vu": 0.14}, {"hours": 989.1, "vu": 0.13}]}, {"id": "18111682228909243", "caption": "Una camisa se desgasta, pero un reloj es para toda la vida 👴🏼⌚️  Este día del padre si le vas a regalar algo ?   Recuerd", "type": "VIDEO", "permalink": "https://www.instagram.com/reel/DYz1cwzgxoz/", "published": "2026-05-26", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 816, "reach": 2851, "likes": 40, "comments": 4, "saved": 9, "shares": 2}, {"snapshot_date": "2026-06-30", "hours": 840, "reach": 2863, "likes": 40, "comments": 4, "saved": 9, "shares": 2}, {"snapshot_date": "2026-07-01", "hours": 875.1, "reach": 2888, "likes": 40, "comments": 4, "saved": 9, "shares": 2}, {"snapshot_date": "2026-07-02", "hours": 893.6, "reach": 2908, "likes": 40, "comments": 4, "saved": 9, "shares": 2}, {"snapshot_date": "2026-07-05", "hours": 959.3, "reach": 2946, "likes": 41, "comments": 4, "saved": 10, "shares": 2}], "tag": "sin etiquetar", "vida_util": 3.07, "vu_series": [{"hours": 816, "vu": 3.49}, {"hours": 840, "vu": 3.41}, {"hours": 875.1, "vu": 3.3}, {"hours": 893.6, "vu": 3.25}, {"hours": 959.3, "vu": 3.07}]}, {"id": "18012825428910957", "caption": "🚨🚨🚨🚨  Este post es muy especial para nosotros🥹, nos sentimos muy felices y llenos de gratitud de ser parte de @casacient", "type": "CAROUSEL_ALBUM", "permalink": "https://www.instagram.com/p/DYqQrryCfqG/", "published": "2026-05-23", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 888, "reach": 5534, "likes": 72, "comments": 9, "saved": 9, "shares": 2}, {"snapshot_date": "2026-06-30", "hours": 912, "reach": 5605, "likes": 74, "comments": 9, "saved": 9, "shares": 2}, {"snapshot_date": "2026-07-01", "hours": 964.4, "reach": 5802, "likes": 76, "comments": 9, "saved": 9, "shares": 2}, {"snapshot_date": "2026-07-02", "hours": 982.9, "reach": 5855, "likes": 76, "comments": 9, "saved": 9, "shares": 2}], "tag": "sin etiquetar", "vida_util": 5.96, "vu_series": [{"hours": 888, "vu": 6.23}, {"hours": 912, "vu": 6.15}, {"hours": 964.4, "vu": 6.02}, {"hours": 982.9, "vu": 5.96}]}, {"id": "18587693290002258", "caption": "Estos relojes te hacen ver pobre 🤡⌚  La gente que sabe, lo ve inmediatamente.  Porque el estilo no es solo lo que usas  ", "type": "VIDEO", "permalink": "https://www.instagram.com/reel/DYnoFovpEME/", "published": "2026-05-21", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 936, "reach": 1612, "likes": 31, "comments": 5, "saved": 4, "shares": 5}, {"snapshot_date": "2026-06-30", "hours": 960, "reach": 1613, "likes": 31, "comments": 5, "saved": 4, "shares": 5}, {"snapshot_date": "2026-07-01", "hours": 988.9, "reach": 1613, "likes": 31, "comments": 5, "saved": 4, "shares": 5}, {"snapshot_date": "2026-07-02", "hours": 1007.4, "reach": 1613, "likes": 31, "comments": 5, "saved": 4, "shares": 5}], "tag": "sin etiquetar", "vida_util": 1.6, "vu_series": [{"hours": 936, "vu": 1.72}, {"hours": 960, "vu": 1.68}, {"hours": 988.9, "vu": 1.63}, {"hours": 1007.4, "vu": 1.6}]}, {"id": "18104376200058995", "caption": "Estos relojes te hacen ver pobre 🤡⌚  La gente que sabe, lo ve inmediatamente.  Porque el estilo no es solo lo que usas  ", "type": "VIDEO", "permalink": "https://www.instagram.com/reel/DYnn-pIJvb5/", "published": "2026-05-21", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 936, "reach": 5798, "likes": 89, "comments": 11, "saved": 8, "shares": 26}, {"snapshot_date": "2026-06-30", "hours": 960, "reach": 5799, "likes": 89, "comments": 11, "saved": 8, "shares": 26}, {"snapshot_date": "2026-07-01", "hours": 988.9, "reach": 5810, "likes": 90, "comments": 11, "saved": 8, "shares": 26}], "tag": "sin etiquetar", "vida_util": 5.88, "vu_series": [{"hours": 936, "vu": 6.19}, {"hours": 960, "vu": 6.04}, {"hours": 988.9, "vu": 5.88}]}, {"id": "17889706359482274", "caption": "Estos relojes te hacen ver pobre 🤡⌚  La gente que sabe, lo ve inmediatamente.  Porque el estilo no es solo lo que usas  ", "type": "VIDEO", "permalink": "https://www.instagram.com/reel/DYnn3MvpEUO/", "published": "2026-05-21", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 936, "reach": 384, "likes": 8, "comments": 0, "saved": 0, "shares": 0}, {"snapshot_date": "2026-06-30", "hours": 960, "reach": 384, "likes": 8, "comments": 0, "saved": 0, "shares": 0}], "tag": "sin etiquetar", "vida_util": 0.4, "vu_series": [{"hours": 936, "vu": 0.41}, {"hours": 960, "vu": 0.4}]}, {"id": "18050781950778024", "caption": "Estos relojes te hacen ver pobre 🤡⌚  La gente que sabe, lo ve inmediatamente.  Porque el estilo no es solo lo que usas  ", "type": "VIDEO", "permalink": "https://www.instagram.com/reel/DYnnnxOpXL1/", "published": "2026-05-21", "published_at": "", "series": [{"snapshot_date": "2026-06-29", "hours": 936, "reach": 148, "likes": 1, "comments": 0, "saved": 0, "shares": 1}, {"snapshot_date": "2026-06-30", "hours": 960, "reach": 148, "likes": 1, "comments": 0, "saved": 0, "shares": 1}], "tag": "sin etiquetar", "vida_util": 0.15, "vu_series": [{"hours": 936, "vu": 0.16}, {"hours": 960, "vu": 0.15}]}];
+mergeLocalTags(ALL_POSTS_VU);
+
+function avg(arr) { return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }
+
+function renderInsightGroup(containerId, groups, unit) {
+  const container = document.getElementById(containerId);
+  if (!groups.length) {
+    container.innerHTML = '<p style="color:#444466;font-size:.75rem">Sin datos suficientes aún</p>';
+    return;
+  }
+  const maxVal = Math.max(...groups.map(g => g.val), 0.01);
+  container.innerHTML = groups.map(g => {
+    const pct = Math.round((g.val / maxVal) * 100);
+    const color = TAG_COLORS[g.label] || "#5c6bc0";
+    const valStr = unit === "reach/h" ? g.val.toFixed(1) : Math.round(g.val).toLocaleString("es-CO");
+    return `<div class="insight-row">
+      <span class="insight-label">${g.label}</span>
+      <div class="insight-bar-wrap"><div class="insight-bar" style="width:${pct}%;background:${color}"></div></div>
+      <span class="insight-val">${valStr} <span style="font-size:.6rem;color:#666">${unit}</span></span>
+    </div>`;
+  }).join("") + `<p style="font-size:.65rem;color:#444466;margin-top:8px">${groups.reduce((a,g)=>a+g.n,0)} posts · ${groups.map(g=>`${g.label}: ${g.n}`).join(", ")}</p>`;
+}
+
+function renderInsights() {
+  const posts = ALL_POSTS_VU.filter(p => p.vida_util > 0);
+
+  // Por formato
+  const byFormat = {};
+  posts.forEach(p => {
+    const fmt = p.type === "VIDEO" ? "Video" : p.type === "CAROUSEL_ALBUM" ? "Carrusel" : "Foto";
+    if (!byFormat[fmt]) byFormat[fmt] = [];
+    byFormat[fmt].push(p.vida_util);
+  });
+  const formatGroups = Object.entries(byFormat)
+    .map(([label, vals]) => ({ label, val: avg(vals), n: vals.length }))
+    .sort((a,b) => b.val - a.val);
+  renderInsightGroup("insightFormat", formatGroups, "reach/h");
+
+  // Por tag
+  const byTag = {};
+  posts.forEach(p => {
+    const t = p.tag || "sin etiquetar";
+    if (!byTag[t]) byTag[t] = [];
+    byTag[t].push(p.vida_util);
+  });
+  const tagGroups = Object.entries(byTag)
+    .filter(([k]) => k !== "sin etiquetar")
+    .map(([label, vals]) => ({ label, val: avg(vals), n: vals.length }))
+    .sort((a,b) => b.val - a.val);
+  renderInsightGroup("insightTag", tagGroups.length ? tagGroups : [], "reach/h");
+
+  // Por hora de publicación (Colombia = UTC-5)
+  const bySlot = { "Mañana (<12h)": [], "Tarde (12-18h)": [], "Noche (>18h)": [] };
+  posts.forEach(p => {
+    if (!p.published_at) return;
+    const utcH = new Date(p.published_at.replace("+0000","Z")).getUTCHours();
+    const colH = (utcH - 5 + 24) % 24;
+    if (colH < 12) bySlot["Mañana (<12h)"].push(p.vida_util);
+    else if (colH < 18) bySlot["Tarde (12-18h)"].push(p.vida_util);
+    else bySlot["Noche (>18h)"].push(p.vida_util);
+  });
+  const hourGroups = Object.entries(bySlot)
+    .filter(([,vals]) => vals.length > 0)
+    .map(([label, vals]) => ({ label, val: avg(vals), n: vals.length }))
+    .sort((a,b) => b.val - a.val);
+  renderInsightGroup("insightHour", hourGroups, "reach/h");
+}
+
+renderInsights();
+
+// ── Modal de detalle por post ────────────────────────────────
+let modalChart   = null;
+let modalPost    = null;
+let modalMetric  = "vida_util";
+
+const ALL_POSTS  = ALL_POSTS_VU;
+const POST_INDEX = {};
+ALL_POSTS.forEach(p => POST_INDEX[p.id] = p);
+
+function openModal(pid) {
+  modalPost   = POST_INDEX[pid] || null;
+  modalMetric = "vida_util";
+
+  document.querySelectorAll("#modalMetricBtns .btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.m === "vida_util");
+  });
+
+  document.getElementById("modalOverlay").classList.add("open");
+  document.body.style.overflow = "hidden";
+  renderModalChart();
+}
+
+function closeModal() {
+  document.getElementById("modalOverlay").classList.remove("open");
+  document.body.style.overflow = "";
+  if (modalChart) { modalChart.destroy(); modalChart = null; }
+}
+
+function renderModalChart() {
+  if (!modalPost) return;
+  const post = modalPost;
+
+  // Cabecera
+  document.getElementById("modalTitle").textContent = post.caption || post.published;
+  const typeIcon = { IMAGE:"🖼️", VIDEO:"🎥", CAROUSEL_ALBUM:"🎞️" }[post.type] || "📄";
+  document.getElementById("modalMeta").innerHTML =
+    `${typeIcon} &nbsp; Publicado el ${post.published} &nbsp;·&nbsp; `+
+    `<a href="${post.permalink}" target="_blank" style="color:#7986cb">Ver en Instagram ↗</a>`;
+
+  // Stats actuales (último snapshot)
+  const last = post.series[post.series.length - 1] || {};
+  const vuLast = (post.vu_series && post.vu_series[post.vu_series.length-1] || {}).vu || 0;
+  document.getElementById("modalStats").innerHTML = [
+    ["Vida útil", vuLast.toFixed(1) + " r/h"],
+    ["Alcance", (last.reach||0).toLocaleString("es-CO")],
+    ["Likes", (last.likes||0).toLocaleString("es-CO")],
+    ["Guardados", (last.saved||0).toLocaleString("es-CO")],
+    ["Horas activo", Math.round(last.hours||0)],
+    ["Tipo", post.tag || "sin etiquetar"]
+  ].map(([l,v]) => `<div class="modal-stat"><div class="s-label">${l}</div><div class="s-value" style="font-size:1.1rem">${v}</div></div>`).join("");
+
+  // Sin datos suficientes
+  const hasSeries = post.series.length >= 2;
+  const hasOne    = post.series.length === 1;
+  document.getElementById("modalNoData").style.display  = (!hasSeries) ? "block" : "none";
+  document.getElementById("modalChart").style.display   = hasSeries ? "block" : "none";
+  if (!hasSeries) {
+    const last0 = post.series[0] || {};
+    document.getElementById("modalNoData").innerHTML =
+      hasOne
+        ? `<strong style="color:#8888aa">Solo 1 medición disponible</strong> (a las ${Math.round(last0.hours||0)}h de vida)<br>
+           Vuelve mañana para ver cómo está evolucionando. 📅`
+        : `Aún no hay snapshots para este post. 📅`;
+    return;
+  }
+
+  // Obtener serie del post según métrica seleccionada
+  let hours, postVals, avgVals, yLabel;
+
+  if (modalMetric === "vida_util") {
+    const vuSeries = post.vu_series || [];
+    hours    = vuSeries.map(s => s.hours||0).sort((a,b) => a-b);
+    postVals = hours.map(h => { const s = vuSeries.find(x=>(x.hours||0)===h); return s ? s.vu : null; });
+    // Promedio de vida útil global
+    const avgVuByH = {}, cntH = {};
+    ALL_POSTS.forEach(p => (p.vu_series||[]).forEach(s => {
+      const h = s.hours||0;
+      avgVuByH[h] = (avgVuByH[h]||0) + (s.vu||0);
+      cntH[h]     = (cntH[h]||0) + 1;
+    }));
+    avgVals = hours.map(h => cntH[h] ? +(avgVuByH[h]/cntH[h]).toFixed(2) : null);
+    yLabel  = "reach/hora";
+  } else {
+    const avgByDay = {}, countByDay = {};
+    ALL_POSTS.forEach(p => p.series.forEach(s => {
+      const h = s.hours || 0;
+      avgByDay[h]   = (avgByDay[h]   || 0) + (s[modalMetric] || 0);
+      countByDay[h] = (countByDay[h] || 0) + 1;
+    }));
+    hours    = post.series.map(s => s.hours||0).sort((a,b) => a-b);
+    postVals = hours.map(h => { const s = post.series.find(x=>(x.hours||0)===h); return s ? s[modalMetric]||0 : null; });
+    avgVals  = hours.map(h => countByDay[h] ? Math.round(avgByDay[h]/countByDay[h]) : null);
+    yLabel   = METRIC_LABELS[modalMetric] || modalMetric;
+  }
+
+  function fmtHours(h) { return h < 168 ? `${h}h` : `${Math.round(h/24)}d`; }
+
+  if (modalChart) modalChart.destroy();
+  modalChart = new Chart(document.getElementById("modalChart").getContext("2d"), {
+    type: "bar",
+    data: {
+      labels: hours.map(h => fmtHours(h)),
+      datasets: [
+        {
+          label: "Este post",
+          data: postVals,
+          backgroundColor: "rgba(92,107,192,0.75)",
+          borderColor: "#5c6bc0",
+          borderWidth: 1.5,
+          borderRadius: 5,
+          order: 2
+        },
+        {
+          label: "Promedio general",
+          data: avgVals,
+          type: "line",
+          borderColor: "#fb8c00",
+          backgroundColor: "transparent",
+          borderDash: [5,4],
+          pointRadius: 5, pointHoverRadius: 7,
+          tension: 0, borderWidth: 2,
+          order: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: true, labels: { color: "#9090cc", font: { size: 11 }, boxWidth: 14 } },
+        tooltip: {
+          backgroundColor: "#1a1a2e", borderColor: "#3a3a5c", borderWidth: 1,
+          titleColor: "#fff", bodyColor: "#cccce0",
+          callbacks: {
+            label: item => ` ${item.dataset.label}: ${(item.parsed.y||0).toLocaleString("es-CO")}`
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: "#8888aa" }, grid: { color: "#1e1e38" } },
+        y: {
+          title: { display: true, text: yLabel, color: "#8888aa" },
+          ticks: { color: "#8888aa" }, grid: { color: "#1e1e38" }
+        }
+      }
+    }
+  });
+}
+
+document.querySelectorAll("#modalMetricBtns .btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("#modalMetricBtns .btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    modalMetric = btn.dataset.m;
+    if (modalChart) { modalChart.destroy(); modalChart = null; }
+    renderModalChart();
+  });
+});
+
+// Cerrar con Escape
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+</script>
+</body>
+</html>

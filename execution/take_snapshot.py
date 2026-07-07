@@ -2,13 +2,18 @@
 """
 Serrat Relojes — Snapshot automático diario
 Corre en Railway (cron). Lee/escribe post_snapshots.json via GitHub API.
+Genera dashboard HTML y lo sube a docs/index.html (GitHub Pages).
 Notifica por Telegram al finalizar.
 """
 
-import os, json, time, base64
+import os, json, time, base64, sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import urllib.request, urllib.parse, urllib.error
+
+# Importar build_html desde generate_dashboard
+sys.path.insert(0, str(Path(__file__).parent))
+import generate_dashboard as gd
 
 # ── Config desde env vars ─────────────────────────────────────
 def env(key):
@@ -31,6 +36,7 @@ TG_CHAT_ID   = env("TG_CHAT_ID")
 GH_TOKEN     = env("GH_TOKEN")
 GH_REPO      = env("GH_REPO")          # formato: "usuario/repo"
 GH_SNAPSHOTS = env("GH_SNAPSHOTS_PATH") or "data/post_snapshots.json"
+GH_DASHBOARD = "docs/index.html"
 
 BASE_IG = "https://graph.facebook.com/v21.0"
 BASE_GH = "https://api.github.com"
@@ -103,6 +109,26 @@ def gh_write_snapshots(history, sha, message):
     content = base64.b64encode(
         json.dumps(history, ensure_ascii=False, indent=2).encode("utf-8")
     ).decode("ascii")
+    payload = {"message": message, "content": content}
+    if sha:
+        payload["sha"] = sha
+    http_put(url, payload, gh_headers())
+
+def gh_get_sha(path):
+    """Obtiene el SHA actual de un archivo en el repo (None si no existe)."""
+    url = f"{BASE_GH}/repos/{GH_REPO}/contents/{path}"
+    try:
+        res = http_get(url, gh_headers())
+        return res.get("sha")
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None
+        raise
+
+def gh_write_file(path, content_str, sha, message):
+    """Escribe cualquier archivo al repo via GitHub API."""
+    url     = f"{BASE_GH}/repos/{GH_REPO}/contents/{path}"
+    content = base64.b64encode(content_str.encode("utf-8")).decode("ascii")
     payload = {"message": message, "content": content}
     if sha:
         payload["sha"] = sha
@@ -186,10 +212,22 @@ def main():
             tg_send(msg)
             return
 
-        print("  → Escribiendo en GitHub...")
+        print("  → Escribiendo snapshot en GitHub...")
         num_new = len([k for k in history if not k.startswith("_")])
         commit_msg = f"snapshot: {today} ({len(posts)} posts)"
         gh_write_snapshots(history, sha, commit_msg)
+
+        print("  → Obteniendo datos adicionales para el dashboard...")
+        perfil   = gd.get_perfil()
+        insights = gd.get_insights_28d()
+        demo     = gd.get_demografia()
+
+        print("  → Generando dashboard HTML...")
+        html = gd.build_html(perfil, insights, posts, demo, history)
+
+        print("  → Subiendo dashboard a GitHub Pages...")
+        dash_sha = gh_get_sha(GH_DASHBOARD)
+        gh_write_file(GH_DASHBOARD, html, dash_sha, f"dashboard: {today}")
 
         # Resumen para Telegram
         snap     = history[today]
@@ -212,7 +250,8 @@ def main():
             f"✅ <b>Serrat Dashboard — Snapshot diario</b>\n"
             f"📅 {today}  🕐 {taken_col} Colombia\n"
             f"📸 {num_new} snapshots acumulados · {len(posts)} posts medidos\n\n"
-            f"<b>Top 3 por reach hoy:</b>\n{top3_txt}"
+            f"<b>Top 3 por reach hoy:</b>\n{top3_txt}\n\n"
+            f"🔗 https://daserrato10-lang.github.io/serrat-dashboard/"
         )
         tg_send(msg)
         print(f"  ✅ Snapshot guardado: {today} — {len(posts)} posts")
