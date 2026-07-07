@@ -86,6 +86,13 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_response(503)
                 self.end_headers()
                 self.wfile.write(f"Error: {e}".encode())
+        elif self.path == "/tags":
+            try:
+                raw, _ = gh_read(GH_TAGS_PATH)
+                tags = json.loads(raw)
+            except Exception:
+                tags = {}
+            self.send_json(200, tags)
         elif self.path == "/health":
             self.send_json(200, {"ok": True})
         else:

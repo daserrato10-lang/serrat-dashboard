@@ -734,15 +734,23 @@ const METRIC_LABELS = {{ vida_util:"Vida útil (reach/h)", reach:"Alcance total"
 let currentMetric = "vida_util";
 let rankingChart  = null;
 
-// Carga tags desde localStorage (sobreescribe los del HTML si existen)
-function loadLocalTags() {{
-  try {{ return JSON.parse(localStorage.getItem("serrat_tags") || "{{}}"); }} catch(e) {{ return {{}}; }}
-}}
+// Tags se cargan desde el servidor al iniciar
+let _tags = {{}};
 function mergeLocalTags(posts) {{
-  const local = loadLocalTags();
-  posts.forEach(p => {{ if (local[p.id]) p.tag = local[p.id]; }});
+  posts.forEach(p => {{ if (_tags[p.id]) p.tag = _tags[p.id]; }});
 }}
-mergeLocalTags(GROWTH_POSTS);
+
+async function loadTagsFromServer() {{
+  try {{
+    const r = await fetch("/tags");
+    if (r.ok) _tags = await r.json();
+  }} catch(_) {{}}
+  mergeLocalTags(GROWTH_POSTS);
+  mergeLocalTags(ALL_POSTS_VU);
+  applyTagsToSelects();
+  renderRanking();
+  renderInsights();
+}}
 
 function shortCap(caption, len) {{
   len = len || 45;
@@ -843,11 +851,9 @@ function saveTag(sel) {{
   sel.style.borderColor = color;
   sel.style.color = color;
 
-  const local = loadLocalTags();
-  local[pid] = tag;
-  localStorage.setItem("serrat_tags", JSON.stringify(local));
+  _tags[pid] = tag;
 
-  // Actualizar GROWTH_POSTS en memoria para que los insights se actualicen
+  // Actualizar en memoria para que los insights se actualicen
   GROWTH_POSTS.forEach(p => {{ if (p.id === pid) p.tag = tag; }});
   renderRanking();
   renderInsights();
@@ -863,11 +869,10 @@ async function saveTags() {{
   btn.disabled = true;
 
   try {{
-    const local = loadLocalTags();
     const res = await fetch("/save-tags", {{
       method: "POST",
       headers: {{ "Content-Type": "application/json" }},
-      body: JSON.stringify(local)
+      body: JSON.stringify(_tags)
     }});
 
     if (res.ok) {{
@@ -885,23 +890,20 @@ async function saveTags() {{
   }}
 }}
 
-// Aplicar tags del localStorage a los selects de la tabla
-(function applyLocalTagsToSelects() {{
-  const local = loadLocalTags();
+function applyTagsToSelects() {{
   document.querySelectorAll(".tag-select").forEach(sel => {{
     const pid = sel.dataset.pid;
-    if (local[pid]) {{
-      sel.value = local[pid];
-      const color = TAG_COLORS[local[pid]] || "#555577";
+    if (_tags[pid]) {{
+      sel.value = _tags[pid];
+      const color = TAG_COLORS[_tags[pid]] || "#555577";
       sel.style.borderColor = color;
       sel.style.color = color;
     }}
   }});
-}})();
+}}
 
 // ── Insights por tipo ────────────────────────────────────────
 const ALL_POSTS_VU = {all_posts_json};
-mergeLocalTags(ALL_POSTS_VU);
 
 function avg(arr) {{ return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }}
 
@@ -976,7 +978,9 @@ function renderInsights() {{
   renderInsightGroup("insightHour", hourGroups, "reach/h");
 }}
 
-renderInsights();
+// Las etiquetas se cargan del servidor — renderInsights y renderRanking
+// se vuelven a llamar desde loadTagsFromServer() al completar
+loadTagsFromServer();
 
 // ── Modal de detalle por post ────────────────────────────────
 let modalChart   = null;
