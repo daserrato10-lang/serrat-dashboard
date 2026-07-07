@@ -97,11 +97,16 @@ def get_posts(limit=30, history=None):
     posts = media.get("data", [])
     recent_ids = {p["id"] for p in posts}
 
-    # Posts históricos que ya no están en los últimos 30
+    # Posts históricos (últimos 90 días) que ya no están en los últimos 30
     if history:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=90)).date()
         all_tracked = set()
-        for day_data in history.values():
-            all_tracked.update(pid for pid in day_data if pid != "_meta")
+        for day_str, day_data in history.items():
+            try:
+                if datetime.strptime(day_str, "%Y-%m-%d").date() >= cutoff:
+                    all_tracked.update(pid for pid in day_data if pid != "_meta")
+            except ValueError:
+                pass
         extra_ids = all_tracked - recent_ids
         for pid in extra_ids:
             p = fetch_single_post(pid)
