@@ -268,7 +268,7 @@ def build_growth_data_all(history):
 
 # ── Tags ─────────────────────────────────────────────────────
 
-CATEGORIES = ["evento", "producto", "lifestyle", "comunidad", "sin etiquetar"]
+CATEGORIES = ["atracción", "conexión", "conversión", "sin etiquetar"]
 
 def load_tags():
     if TAGS_FILE.exists():
@@ -285,10 +285,9 @@ COLORS = [
     "#8e24aa","#1e88e5","#f4511e","#39ac73","#c0ca33"
 ]
 TAG_COLORS = {
-    "evento":        "#e91e63",
-    "producto":      "#1e88e5",
-    "lifestyle":     "#43a047",
-    "comunidad":     "#fb8c00",
+    "atracción":     "#e91e63",
+    "conexión":      "#43a047",
+    "conversión":    "#1e88e5",
     "sin etiquetar": "#555577",
 }
 
@@ -575,7 +574,7 @@ def build_html(perfil, insights, posts, demo, history):
   </div>
 
   <!-- INSIGHTS POR TIPO -->
-  <h2>Insights por tipo de contenido</h2>
+  <h2>Insights por etapa del embudo</h2>
   <div class="insight-grid">
     <div class="insight-box">
       <h3>Vida útil promedio por formato</h3>
@@ -583,7 +582,7 @@ def build_html(perfil, insights, posts, demo, history):
       <p class="insight-note">reach/hora · calculado con snapshots disponibles</p>
     </div>
     <div class="insight-box">
-      <h3>Vida útil promedio por tipo de contenido</h3>
+      <h3>Vida útil promedio por etapa del embudo</h3>
       <div id="insightTag"><p style="color:#444466;font-size:.75rem">Cargando…</p></div>
       <p class="insight-note">etiqueta los posts en la tabla para ver este análisis</p>
     </div>
