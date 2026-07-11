@@ -556,7 +556,7 @@ def build_html(perfil, insights, posts, demo, history):
 
   <!-- RANKING POR VIDA ÚTIL -->
   <div class="card">
-    <h2 style="margin-top:0">Ranking — vida útil <small style="font-size:.65rem;color:#555588;font-weight:400;text-transform:none;letter-spacing:0">(reach / hora desde publicación)</small></h2>
+    <h2 style="margin-top:0">Ranking de posts <small style="font-size:.65rem;color:#555588;font-weight:400;text-transform:none;letter-spacing:0">— basado en alcance a las 48h de vida</small></h2>
     <div class="controls">
       <span class="ctrl-label">Ordenar por:</span>
       <div class="btn-group" id="metricBtns">
@@ -573,21 +573,21 @@ def build_html(perfil, insights, posts, demo, history):
     <canvas id="rankingChart" style="max-height:380px"></canvas>
   </div>
 
-  <!-- INSIGHTS POR TIPO -->
-  <h2>Insights por etapa del embudo</h2>
+  <!-- INSIGHTS -->
+  <h2>¿Qué funciona mejor? <small style="font-size:.65rem;color:#555588;font-weight:400;text-transform:none;letter-spacing:0">— alcance promedio a las 48h por categoría</small></h2>
   <div class="insight-grid">
     <div class="insight-box">
-      <h3>Vida útil promedio por formato</h3>
+      <h3>Por formato</h3>
       <div id="insightFormat"><p style="color:#444466;font-size:.75rem">Cargando…</p></div>
-      <p class="insight-note">reach/hora · calculado con snapshots disponibles</p>
+      <p class="insight-note">alcance 48h promedio · reach total entre paréntesis</p>
     </div>
     <div class="insight-box">
-      <h3>Vida útil promedio por etapa del embudo</h3>
+      <h3>Por etapa del embudo</h3>
       <div id="insightTag"><p style="color:#444466;font-size:.75rem">Cargando…</p></div>
       <p class="insight-note">etiqueta los posts en la tabla para ver este análisis</p>
     </div>
     <div class="insight-box">
-      <h3>Hora de publicación vs vida útil</h3>
+      <h3>Por hora de publicación</h3>
       <div id="insightHour"><p style="color:#444466;font-size:.75rem">Cargando…</p></div>
       <p class="insight-note">mañana (&lt;12h) · tarde (12-18h) · noche (&gt;18h) hora Colombia</p>
     </div>
@@ -722,7 +722,7 @@ document.querySelectorAll("#windowBtns .btn").forEach(btn => {{
 renderWindow(28); // render inicial
 
 
-// ── Ranking por vida útil ────────────────────────────────────
+// ── Ranking de posts ─────────────────────────────────────────
 const GROWTH_POSTS  = {growth_json};
 const COLORS        = {colors_json};
 const TAG_COLORS    = {tag_colors_json};
@@ -920,63 +920,66 @@ function renderInsightGroup(containerId, groups, unit) {{
     const pct = Math.round((g.val / maxVal) * 100);
     const color = TAG_COLORS[g.label] || "#5c6bc0";
     const valStr = unit === "reach/h" ? g.val.toFixed(1) : Math.round(g.val).toLocaleString("es-CO");
+    const unitStr = unit === "reach 48h" ? "reach" : unit;
     const reachStr = showReach && g.reach != null
       ? `<span style="font-size:.65rem;color:#888;margin-left:8px">· alcance prom: ${{Math.round(g.reach).toLocaleString("es-CO")}}</span>`
       : "";
     return `<div class="insight-row">
       <span class="insight-label">${{g.label}}</span>
       <div class="insight-bar-wrap"><div class="insight-bar" style="width:${{pct}}%;background:${{color}}"></div></div>
-      <span class="insight-val">${{valStr}} <span style="font-size:.6rem;color:#666">${{unit}}</span>${{reachStr}}</span>
+      <span class="insight-val">${{valStr}} <span style="font-size:.6rem;color:#666">${{unitStr}}</span>${{reachStr}}</span>
     </div>`;
   }}).join("") + `<p style="font-size:.65rem;color:#444466;margin-top:8px">${{groups.reduce((a,g)=>a+g.n,0)}} posts · ${{groups.map(g=>`${{g.label}}: ${{g.n}}`).join(", ")}}</p>`;
 }}
 
 function renderInsights() {{
-  const posts = ALL_POSTS_VU.filter(p => p.vida_util > 0);
+  const posts = ALL_POSTS_VU.filter(p => p.reach_48h > 0);
 
-  // Por formato — vida útil + reach total promedio
+  // Por formato — alcance 48h + reach total promedio
   const byFormat = {{}};
-  ALL_POSTS_VU.forEach(p => {{
+  posts.forEach(p => {{
     const fmt = p.type === "VIDEO" ? "Video" : p.type === "CAROUSEL_ALBUM" ? "Carrusel" : "Foto";
-    if (!byFormat[fmt]) byFormat[fmt] = {{ vu: [], reach: [] }};
-    if (p.vida_util > 0) byFormat[fmt].vu.push(p.vida_util);
+    if (!byFormat[fmt]) byFormat[fmt] = {{ r48: [], reach: [] }};
+    byFormat[fmt].r48.push(p.reach_48h);
     const lastSnap = p.series && p.series.length ? p.series[p.series.length-1] : null;
     if (lastSnap && lastSnap.reach > 0) byFormat[fmt].reach.push(lastSnap.reach);
   }});
   const formatGroups = Object.entries(byFormat)
-    .filter(([,d]) => d.vu.length > 0)
-    .map(([label, d]) => ({{ label, val: avg(d.vu), reach: avg(d.reach), n: d.vu.length }}))
+    .map(([label, d]) => ({{ label, val: avg(d.r48), reach: avg(d.reach), n: d.r48.length }}))
     .sort((a,b) => b.val - a.val);
-  renderInsightGroup("insightFormat", formatGroups, "reach/h");
+  renderInsightGroup("insightFormat", formatGroups, "reach 48h");
 
-  // Por tag
+  // Por etapa del embudo
   const byTag = {{}};
   posts.forEach(p => {{
     const t = p.tag || "sin etiquetar";
-    if (!byTag[t]) byTag[t] = [];
-    byTag[t].push(p.vida_util);
+    if (t === "sin etiquetar") return;
+    if (!byTag[t]) byTag[t] = {{ r48: [], reach: [] }};
+    byTag[t].r48.push(p.reach_48h);
+    const lastSnap = p.series && p.series.length ? p.series[p.series.length-1] : null;
+    if (lastSnap && lastSnap.reach > 0) byTag[t].reach.push(lastSnap.reach);
   }});
   const tagGroups = Object.entries(byTag)
-    .filter(([k]) => k !== "sin etiquetar")
-    .map(([label, vals]) => ({{ label, val: avg(vals), n: vals.length }}))
+    .map(([label, d]) => ({{ label, val: avg(d.r48), reach: avg(d.reach), n: d.r48.length }}))
     .sort((a,b) => b.val - a.val);
-  renderInsightGroup("insightTag", tagGroups.length ? tagGroups : [], "reach/h");
+  renderInsightGroup("insightTag", tagGroups.length ? tagGroups : [], "reach 48h");
 
   // Por hora de publicación (Colombia = UTC-5)
-  const bySlot = {{ "Mañana (<12h)": [], "Tarde (12-18h)": [], "Noche (>18h)": [] }};
+  const bySlot = {{ "Mañana (<12h)": {{ r48:[], reach:[] }}, "Tarde (12-18h)": {{ r48:[], reach:[] }}, "Noche (>18h)": {{ r48:[], reach:[] }} }};
   posts.forEach(p => {{
     if (!p.published_at) return;
     const utcH = new Date(p.published_at.replace("+0000","Z")).getUTCHours();
     const colH = (utcH - 5 + 24) % 24;
-    if (colH < 12) bySlot["Mañana (<12h)"].push(p.vida_util);
-    else if (colH < 18) bySlot["Tarde (12-18h)"].push(p.vida_util);
-    else bySlot["Noche (>18h)"].push(p.vida_util);
+    const slot = colH < 12 ? "Mañana (<12h)" : colH < 18 ? "Tarde (12-18h)" : "Noche (>18h)";
+    bySlot[slot].r48.push(p.reach_48h);
+    const lastSnap = p.series && p.series.length ? p.series[p.series.length-1] : null;
+    if (lastSnap && lastSnap.reach > 0) bySlot[slot].reach.push(lastSnap.reach);
   }});
   const hourGroups = Object.entries(bySlot)
-    .filter(([,vals]) => vals.length > 0)
-    .map(([label, vals]) => ({{ label, val: avg(vals), n: vals.length }}))
+    .filter(([,d]) => d.r48.length > 0)
+    .map(([label, d]) => ({{ label, val: avg(d.r48), reach: avg(d.reach), n: d.r48.length }}))
     .sort((a,b) => b.val - a.val);
-  renderInsightGroup("insightHour", hourGroups, "reach/h");
+  renderInsightGroup("insightHour", hourGroups, "reach 48h");
 }}
 
 // Las etiquetas se cargan del servidor — renderInsights y renderRanking
