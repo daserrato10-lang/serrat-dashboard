@@ -327,29 +327,27 @@ def build_html(perfil, insights, posts, demo, history):
     growth_posts   = build_growth_data(history)
     all_posts_data = build_growth_data_all(history)
 
-    # Agregar tag y vida útil a cada post
-    for p in growth_posts:
-        p["tag"] = tags.get(p["id"], "sin etiquetar")
-        last = p["series"][-1] if p["series"] else {}
-        hours = last.get("hours") or 0
+    def enrich_post(p, tag):
+        p["tag"] = tag
+        series = p["series"]
+        last   = series[-1] if series else {}
+        hours  = last.get("hours") or 0
         p["vida_util"] = round(last.get("reach", 0) / hours, 2) if hours > 0 else 0
-        # Curva de vida útil por snapshot
         p["vu_series"] = [
             {"hours": s.get("hours", 0),
              "vu": round(s.get("reach", 0) / s.get("hours", 1), 2) if s.get("hours", 0) > 0 else 0}
-            for s in p["series"]
+            for s in series
         ]
+        # Alcance a las 48h: snapshot más cercano a 48h de vida
+        snap_48 = min(series, key=lambda s: abs(s.get("hours", 0) - 48)) if series else None
+        p["reach_48h"]       = snap_48.get("reach", 0) if snap_48 else 0
+        p["reach_48h_hours"] = round(snap_48.get("hours", 0), 1) if snap_48 else 0
+
+    for p in growth_posts:
+        enrich_post(p, tags.get(p["id"], "sin etiquetar"))
 
     for p in all_posts_data:
-        p["tag"] = tags.get(p["id"], "sin etiquetar")
-        last = p["series"][-1] if p["series"] else {}
-        hours = last.get("hours") or 0
-        p["vida_util"] = round(last.get("reach", 0) / hours, 2) if hours > 0 else 0
-        p["vu_series"] = [
-            {"hours": s.get("hours", 0),
-             "vu": round(s.get("reach", 0) / s.get("hours", 1), 2) if s.get("hours", 0) > 0 else 0}
-            for s in p["series"]
-        ]
+        enrich_post(p, tags.get(p["id"], "sin etiquetar"))
 
     growth_json    = json.dumps(growth_posts, ensure_ascii=False)
     all_posts_json = json.dumps(all_posts_data, ensure_ascii=False)
@@ -562,10 +560,10 @@ def build_html(perfil, insights, posts, demo, history):
     <div class="controls">
       <span class="ctrl-label">Ordenar por:</span>
       <div class="btn-group" id="metricBtns">
-        <button class="btn active" data-metric="vida_util">Vida útil</button>
+        <button class="btn active" data-metric="reach_48h">Alcance 48h</button>
+        <button class="btn" data-metric="vida_util">Vida útil</button>
         <button class="btn" data-metric="reach">Alcance total</button>
         <button class="btn" data-metric="likes">Likes</button>
-        <button class="btn" data-metric="saved">Guardados</button>
       </div>
       <span class="snapshot-info">📸 {num_snapshots} snapshots · desde {first_snapshot}</span>
     </div>
@@ -729,9 +727,9 @@ const GROWTH_POSTS  = {growth_json};
 const COLORS        = {colors_json};
 const TAG_COLORS    = {tag_colors_json};
 const CATEGORIES    = {categories_json};
-const METRIC_LABELS = {{ vida_util:"Vida útil (reach/h)", reach:"Alcance total", likes:"Likes", saved:"Guardados" }};
+const METRIC_LABELS = {{ reach_48h:"Alcance 48h", vida_util:"Vida útil (reach/h)", reach:"Alcance total", likes:"Likes" }};
 
-let currentMetric = "vida_util";
+let currentMetric = "reach_48h";
 let rankingChart  = null;
 
 // Tags se cargan desde el servidor al iniciar
@@ -758,7 +756,8 @@ function shortCap(caption, len) {{
 }}
 
 function getVal(p, metric) {{
-  if (metric === "vida_util") return p.vida_util || 0;
+  if (metric === "reach_48h")  return p.reach_48h || 0;
+  if (metric === "vida_util")  return p.vida_util || 0;
   const last = p.series[p.series.length - 1] || {{}};
   return last[metric] || 0;
 }}
@@ -804,6 +803,8 @@ function renderRanking() {{
             label: item => {{
               const p = ranked[item.dataIndex];
               const last = p.series[p.series.length-1] || {{}};
+              if (currentMetric === "reach_48h")
+                return ` Alcance 48h: ${{item.parsed.x.toLocaleString("es-CO")}} · medido a ${{p.reach_48h_hours||"??"}}h`;
               if (currentMetric === "vida_util")
                 return ` Vida útil: ${{item.parsed.x.toFixed(1)}} reach/h · ${{Math.round(last.hours||0)}}h de vida`;
               return ` ${{METRIC_LABELS[currentMetric]}}: ${{item.parsed.x.toLocaleString("es-CO")}}`;
