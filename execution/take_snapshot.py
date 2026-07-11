@@ -182,18 +182,21 @@ def parse_ig_timestamp(ts):
         return None
 
 def take_snapshot(posts, history):
+    now_utc        = datetime.now(timezone.utc)
     colombia       = timezone(timedelta(hours=-5))
-    now_col        = datetime.now(colombia)
-    today          = now_col.strftime("%Y-%m-%d")
-    snapshot_taken = datetime.now(timezone.utc).isoformat()
+    now_col        = now_utc.astimezone(colombia)
+    # Slot cada 6h basado en hora UTC: 00, 06, 12, 18
+    utc_slot       = (now_utc.hour // 6) * 6
+    snap_key       = now_col.strftime("%Y-%m-%d") + f"_{utc_slot:02d}h"
+    snapshot_taken = now_utc.isoformat()
 
-    if today in history:
-        return history, today, False  # ya existe
+    if snap_key in history:
+        return history, snap_key, False  # ya existe este slot
 
-    history[today] = {"_meta": {"taken_at": snapshot_taken}}
+    history[snap_key] = {"_meta": {"taken_at": snapshot_taken, "slot": utc_slot}}
     for post in posts:
         pid = post["id"]
-        history[today][pid] = {
+        history[snap_key][pid] = {
             "published":    post.get("timestamp", "")[:10],
             "published_at": post.get("timestamp", ""),
             "caption":      (post.get("caption") or "")[:120].replace("\n", " "),
@@ -205,7 +208,7 @@ def take_snapshot(posts, history):
             "saved":        post.get("metric_saved", 0),
             "shares":       post.get("metric_shares", 0),
         }
-    return history, today, True
+    return history, snap_key, True
 
 # ── Telegram ──────────────────────────────────────────────────
 
@@ -225,73 +228,67 @@ def tg_send(text):
 # ── Main ──────────────────────────────────────────────────────
 
 def main():
+    now_utc  = datetime.now(timezone.utc)
     colombia = timezone(timedelta(hours=-5))
-    now_str  = datetime.now(colombia).strftime("%d/%m/%Y %I:%M %p")
+    now_str  = now_utc.astimezone(colombia).strftime("%d/%m/%Y %I:%M %p")
+    utc_slot = (now_utc.hour // 6) * 6
+    is_daily = (utc_slot == 0)  # slot 00h UTC = medianoche Colombia → reporte diario
 
-    print(f"⏳ Iniciando snapshot — {now_str} Colombia")
+    print(f"⏳ Iniciando snapshot — {now_str} Colombia (slot {utc_slot:02d}h UTC)")
 
     try:
         print("  → Leyendo snapshots desde GitHub...")
         history, sha = gh_read_snapshots()
-        num_prev = len([k for k in history if not k.startswith("_")])
 
         print("  → Obteniendo posts de Instagram...")
         posts = get_posts(30, history)
 
         print("  → Guardando snapshot...")
-        history, today, saved = take_snapshot(posts, history)
+        history, snap_key, saved = take_snapshot(posts, history)
 
         if not saved:
-            msg = (f"ℹ️ <b>Serrat Dashboard</b>\n"
-                   f"Ya existía snapshot de {today}. No se guardó duplicado.")
-            print(f"  ℹ️  Snapshot de {today} ya existía.")
-            tg_send(msg)
+            print(f"  ℹ️  Snapshot {snap_key} ya existía — omitiendo.")
             return
 
         print("  → Escribiendo snapshot en GitHub...")
-        num_new = len([k for k in history if not k.startswith("_")])
-        commit_msg = f"snapshot: {today} ({len(posts)} posts)"
-        gh_write_snapshots(history, sha, commit_msg)
+        num_snaps = len([k for k in history if not k.startswith("_")])
+        gh_write_snapshots(history, sha, f"snapshot: {snap_key} ({len(posts)} posts)")
 
         print("  → Obteniendo datos adicionales para el dashboard...")
         perfil   = gd.get_perfil()
         insights = gd.get_all_insights()
         demo     = gd.get_demografia()
 
-        print("  → Generando dashboard HTML...")
-        html = gd.build_html(perfil, insights, posts, demo, history)
-
-        print("  → Subiendo dashboard a GitHub Pages...")
+        print("  → Generando y subiendo dashboard...")
+        html     = gd.build_html(perfil, insights, posts, demo, history)
         dash_sha = gh_get_sha(GH_DASHBOARD)
-        gh_write_file(GH_DASHBOARD, html, dash_sha, f"dashboard: {today}")
+        gh_write_file(GH_DASHBOARD, html, dash_sha, f"dashboard: {snap_key}")
 
-        # Resumen para Telegram
-        snap     = history[today]
-        snap_meta = snap.get("_meta", {})
-        taken_utc = snap_meta.get("taken_at", "")
-        taken_col = ""
-        if taken_utc:
-            dt = datetime.fromisoformat(taken_utc).astimezone(colombia)
-            taken_col = dt.strftime("%I:%M %p")
+        print(f"  ✅ Snapshot guardado: {snap_key} — {len(posts)} posts")
 
-        # Top 3 por reach
-        post_list = [(pid, d) for pid, d in snap.items() if pid != "_meta"]
-        top3 = sorted(post_list, key=lambda x: x[1].get("reach", 0), reverse=True)[:3]
-        top3_txt = "\n".join(
-            f"  {i+1}. {d['caption'][:40]}… → {d['reach']:,} reach"
-            for i, (_, d) in enumerate(top3)
-        )
+        # Telegram solo en el snapshot de medianoche Colombia
+        if is_daily:
+            snap      = history[snap_key]
+            taken_col = now_utc.astimezone(colombia).strftime("%I:%M %p")
+            today_str = now_utc.astimezone(colombia).strftime("%Y-%m-%d")
 
-        msg = (
-            f"✅ <b>Serrat Dashboard — Snapshot diario</b>\n"
-            f"📅 {today}  🕐 {taken_col} Colombia\n"
-            f"📸 {num_new} snapshots acumulados · {len(posts)} posts medidos\n\n"
-            f"<b>Top 3 por reach hoy:</b>\n{top3_txt}\n\n"
-            f"🔗 https://daserrato10-lang.github.io/serrat-dashboard/"
-        )
-        tg_send(msg)
-        print(f"  ✅ Snapshot guardado: {today} — {len(posts)} posts")
-        print(f"  📱 Notificación enviada a Telegram")
+            post_list = [(pid, d) for pid, d in snap.items() if pid != "_meta"]
+            top3 = sorted(post_list, key=lambda x: x[1].get("reach", 0), reverse=True)[:3]
+            top3_txt = "\n".join(
+                f"  {i+1}. {d['caption'][:40]}… → {d['reach']:,} reach"
+                for i, (_, d) in enumerate(top3)
+            )
+            msg = (
+                f"✅ <b>Serrat Dashboard — Snapshot diario</b>\n"
+                f"📅 {today_str}  🕐 {taken_col} Colombia\n"
+                f"📸 {num_snaps} snapshots acumulados · {len(posts)} posts medidos\n\n"
+                f"<b>Top 3 por reach:</b>\n{top3_txt}\n\n"
+                f"🔗 https://eloquent-comfort-production-13d4.up.railway.app"
+            )
+            tg_send(msg)
+            print(f"  📱 Notificación enviada a Telegram")
+        else:
+            print(f"  ⏭️  Slot intermedio — sin notificación Telegram")
 
     except Exception as e:
         error_msg = (
