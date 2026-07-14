@@ -316,7 +316,10 @@ def build_html(perfil, insights, posts, demo, history):
     shares   = ins28.get("shares", 0)
     saves    = ins28.get("saves", 0)
 
-    tags = load_tags()
+    raw_tags  = load_tags()
+    pinned_ids = raw_tags.pop("_pinned", [])   # extrae lista de fijados, no es una tag real
+    tags       = raw_tags
+    pinned_set = set(pinned_ids)
     eng_rate = round(inter / reach * 100, 2) if reach else 0
 
     reach_labels = json.dumps([d["date"] for d in ins28.get("reach_daily", [])])
@@ -354,6 +357,7 @@ def build_html(perfil, insights, posts, demo, history):
     colors_json    = json.dumps(COLORS)
     categories_json = json.dumps(CATEGORIES)
     tag_colors_json = json.dumps(TAG_COLORS)
+    pinned_json    = json.dumps(list(pinned_set))
 
     # Número de snapshots
     num_snapshots = len(history)
@@ -378,6 +382,10 @@ def build_html(perfil, insights, posts, demo, history):
             f'<option value="{c}" {"selected" if c==post_tag else ""}>{c}</option>'
             for c in CATEGORIES
         )
+        is_pinned   = pid in pinned_set
+        pin_icon    = "📌" if is_pinned else "📍"
+        pin_title   = "Fijado — excluido de insights" if is_pinned else "Marcar como fijado en el perfil"
+        pin_cls     = " pin-active" if is_pinned else ""
         posts_rows += f"""
         <tr class="clickable" data-pid="{pid}" onclick="openModal(this.dataset.pid)">
           <td>{pub}<br><small style="color:#666">{days_old}d</small></td>
@@ -388,6 +396,10 @@ def build_html(perfil, insights, posts, demo, history):
                     onclick="event.stopPropagation()" onchange="saveTag(this)">
               {cat_options}
             </select>
+          </td>
+          <td class="center">
+            <button class="pin-btn{pin_cls}" data-pid="{pid}" title="{pin_title}"
+                    onclick="event.stopPropagation(); togglePin(this.dataset.pid)">{pin_icon}</button>
           </td>
           <td class="num">{p.get("like_count",0):,}</td>
           <td class="num">{p.get("comments_count",0):,}</td>
@@ -503,6 +515,10 @@ def build_html(perfil, insights, posts, demo, history):
   .save-tags-btn:hover{{background:#7986cb}}
   .save-tags-wrap{{display:flex;align-items:center;gap:10px;margin-bottom:8px}}
   .save-tags-note{{font-size:.68rem;color:#444466;display:none}}
+  .pin-btn{{background:none;border:none;cursor:pointer;font-size:.95rem;padding:1px 4px;
+            border-radius:6px;opacity:.4;transition:opacity .15s}}
+  .pin-btn:hover{{opacity:1}}
+  .pin-btn.pin-active{{opacity:1}}
 </style>
 </head>
 <body>
@@ -603,6 +619,7 @@ def build_html(perfil, insights, posts, demo, history):
       <thead>
         <tr>
           <th>Fecha</th><th>Caption</th><th>Formato</th><th>Tipo contenido</th>
+          <th class="center" title="Posts fijados en el perfil — excluidos de los insights">📌</th>
           <th class="num">Likes</th><th class="num">Coments</th>
           <th class="num">Alcance</th><th class="num">Guardados</th>
           <th class="num">Compartidos</th><th class="num">Eng%</th><th>Link</th>
@@ -732,8 +749,10 @@ const METRIC_LABELS = {{ reach_48h:"Alcance 48h", vida_util:"Vida útil (reach/h
 let currentMetric = "reach_48h";
 let rankingChart  = null;
 
-// Tags se cargan desde el servidor al iniciar
-let _tags = {{}};
+// Tags y posts fijados — se cargan desde el servidor al iniciar
+let _tags   = {{}};
+let _pinned = new Set({pinned_json});
+
 function mergeLocalTags(posts) {{
   posts.forEach(p => {{ if (_tags[p.id]) p.tag = _tags[p.id]; }});
 }}
@@ -741,11 +760,17 @@ function mergeLocalTags(posts) {{
 async function loadTagsFromServer() {{
   try {{
     const r = await fetch("/tags");
-    if (r.ok) _tags = await r.json();
+    if (r.ok) {{
+      const data = await r.json();
+      const pinnedArr = data._pinned || [];
+      _pinned = new Set(pinnedArr);
+      _tags = Object.fromEntries(Object.entries(data).filter(([k]) => k !== "_pinned"));
+    }}
   }} catch(_) {{}}
   mergeLocalTags(GROWTH_POSTS);
   mergeLocalTags(ALL_POSTS_VU);
   applyTagsToSelects();
+  applyPinBtns();
   renderRanking();
   renderInsights();
 }}
@@ -772,10 +797,10 @@ function renderRanking() {{
   document.getElementById("rankingChart").style.display = noData ? "none"  : "block";
   if (noData) {{ if (rankingChart) {{ rankingChart.destroy(); rankingChart = null; }} return; }}
 
-  const labels   = ranked.map(p => shortCap(p.caption || p.published, 40));
+  const labels   = ranked.map(p => (_pinned.has(p.id) ? "📌 " : "") + shortCap(p.caption || p.published, 38));
   const values   = ranked.map(p => getVal(p, currentMetric));
-  const bgColors = ranked.map(p => (TAG_COLORS[p.tag] || "#5c6bc0") + "bb");
-  const borders  = ranked.map(p => TAG_COLORS[p.tag] || "#5c6bc0");
+  const bgColors = ranked.map(p => _pinned.has(p.id) ? "#44444433" : (TAG_COLORS[p.tag] || "#5c6bc0") + "bb");
+  const borders  = ranked.map(p => _pinned.has(p.id) ? "#666688"   : (TAG_COLORS[p.tag] || "#5c6bc0"));
   const maxVal   = Math.max(...values, 1);
 
   const cfg = {{
@@ -809,7 +834,11 @@ function renderRanking() {{
                 return ` Vida útil: ${{item.parsed.x.toFixed(1)}} reach/h · ${{Math.round(last.hours||0)}}h de vida`;
               return ` ${{METRIC_LABELS[currentMetric]}}: ${{item.parsed.x.toLocaleString("es-CO")}}`;
             }},
-            afterLabel: item => ` Tipo: ${{ranked[item.dataIndex].tag || "sin etiquetar"}}`
+            afterLabel: item => {{
+              const p = ranked[item.dataIndex];
+              const pinNote = _pinned.has(p.id) ? " 📌 Fijado — tráfico del perfil" : "";
+              return ` Tipo: ${{p.tag || "sin etiquetar"}}${{pinNote}}`;
+            }}
           }}
         }}
       }},
@@ -854,13 +883,34 @@ function saveTag(sel) {{
 
   _tags[pid] = tag;
 
-  // Actualizar en memoria para que los insights se actualicen
   GROWTH_POSTS.forEach(p => {{ if (p.id === pid) p.tag = tag; }});
   renderRanking();
   renderInsights();
 
   document.getElementById("saveTagsBtn").style.display = "inline-block";
   document.getElementById("tagsNote").style.display = "inline";
+}}
+
+function togglePin(pid) {{
+  if (_pinned.has(pid)) {{
+    _pinned.delete(pid);
+  }} else {{
+    _pinned.add(pid);
+  }}
+  applyPinBtns();
+  renderRanking();
+  renderInsights();
+  document.getElementById("saveTagsBtn").style.display = "inline-block";
+  document.getElementById("tagsNote").style.display = "inline";
+}}
+
+function applyPinBtns() {{
+  document.querySelectorAll(".pin-btn").forEach(btn => {{
+    const isPinned = _pinned.has(btn.dataset.pid);
+    btn.textContent = isPinned ? "📌" : "📍";
+    btn.classList.toggle("pin-active", isPinned);
+    btn.title = isPinned ? "Fijado — excluido de insights" : "Marcar como fijado en el perfil";
+  }});
 }}
 
 async function saveTags() {{
@@ -870,10 +920,11 @@ async function saveTags() {{
   btn.disabled = true;
 
   try {{
+    const payload = {{ ..._tags, _pinned: [..._pinned] }};
     const res = await fetch("/save-tags", {{
       method: "POST",
       headers: {{ "Content-Type": "application/json" }},
-      body: JSON.stringify(_tags)
+      body: JSON.stringify(payload)
     }});
 
     if (res.ok) {{
@@ -933,7 +984,7 @@ function renderInsightGroup(containerId, groups, unit) {{
 }}
 
 function renderInsights() {{
-  const posts = ALL_POSTS_VU.filter(p => p.reach_48h > 0);
+  const posts = ALL_POSTS_VU.filter(p => p.reach_48h > 0 && !_pinned.has(p.id));
 
   // Por formato — alcance 48h + reach total promedio
   const byFormat = {{}};
