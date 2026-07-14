@@ -1072,9 +1072,14 @@ function renderModalChart() {{
   // Cabecera
   document.getElementById("modalTitle").textContent = post.caption || post.published;
   const typeIcon = {{ IMAGE:"🖼️", VIDEO:"🎥", CAROUSEL_ALBUM:"🎞️" }}[post.type] || "📄";
+  const isPinned = _pinned.has(post.id);
+  const pinLabel = isPinned ? "📌 Fijado en perfil" : "📍 Marcar como fijado";
   document.getElementById("modalMeta").innerHTML =
     `${{typeIcon}} &nbsp; Publicado el ${{post.published}} &nbsp;·&nbsp; `+
-    `<a href="${{post.permalink}}" target="_blank" style="color:#7986cb">Ver en Instagram ↗</a>`;
+    `<a href="${{post.permalink}}" target="_blank" style="color:#7986cb">Ver en Instagram ↗</a>`+
+    `&nbsp;·&nbsp;<button id="modalPinBtn" class="pin-btn${{isPinned ? " pin-active" : ""}}"
+       style="font-size:.75rem;opacity:1;padding:2px 8px;border:1px solid #3a3a5c;border-radius:12px;color:#ccc"
+       onclick="togglePin('${{post.id}}'); renderModalChart();">${{pinLabel}}</button>`;
 
   // Stats actuales (último snapshot)
   const last = post.series[post.series.length - 1] || {{}};
@@ -1239,13 +1244,15 @@ def main():
     print("  → Guardando snapshot diario...")
     OUT.parent.mkdir(exist_ok=True)
 
-    # Si no hay snapshot local, jalar de GitHub
-    if not SNAPSHOTS.exists():
-        print("  → No hay snapshot local — descargando de GitHub...")
-        remote = fetch_snapshots_from_github()
-        if remote:
-            SNAPSHOTS.write_text(json.dumps(remote, ensure_ascii=False, indent=2))
-            print(f"  ✅ {len([k for k in remote if not k.startswith('_')])} snapshots descargados de GitHub")
+    # Siempre sincronizar con GitHub para tener todos los snapshots
+    print("  → Sincronizando snapshots desde GitHub...")
+    remote = fetch_snapshots_from_github()
+    if remote:
+        local = json.loads(SNAPSHOTS.read_text()) if SNAPSHOTS.exists() else {}
+        merged = {**remote, **local}   # local gana si hay conflicto (más reciente)
+        SNAPSHOTS.write_text(json.dumps(merged, ensure_ascii=False, indent=2))
+        n = len([k for k in merged if not k.startswith("_")])
+        print(f"  ✅ {n} snapshots (GitHub + local)")
 
     history = save_snapshot(posts)
 
