@@ -109,11 +109,17 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("body debe ser un objeto JSON")
 
                 try:
-                    _, sha = gh_read(GH_TAGS_PATH)
+                    existing_raw, sha = gh_read(GH_TAGS_PATH)
+                    existing = json.loads(existing_raw)
                 except urllib.error.HTTPError as e:
-                    sha = None if e.code == 404 else (_ for _ in ()).throw(e)
+                    if e.code == 404:
+                        existing, sha = {}, None
+                    else:
+                        raise
 
-                content = json.dumps(tags, ensure_ascii=False, indent=2)
+                # Fusionar: existentes + nuevas (nuevas ganan en conflicto)
+                merged = {**existing, **tags}
+                content = json.dumps(merged, ensure_ascii=False, indent=2)
                 gh_write(GH_TAGS_PATH, content, sha, "tags: actualizar desde dashboard")
                 _cache["ts"] = 0  # Invalidar caché para que el próximo GET regenere
                 self.send_json(200, {"ok": True})
