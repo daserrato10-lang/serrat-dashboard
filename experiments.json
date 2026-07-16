@@ -1,0 +1,86 @@
+{
+  "exp_001": {
+    "name": "Estos relojes te hacen ver pobre",
+    "variable_tested": "",
+    "content_type": "atracción",
+    "status": "pendiente",
+    "created_at": "2026-07-16",
+    "variants": [
+      {
+        "label": "A",
+        "post_id": "18104376200058995",
+        "what_changed": "",
+        "permalink": "https://www.instagram.com/reel/DYnn-pIJvb5/"
+      },
+      {
+        "label": "B",
+        "post_id": "18587693290002258",
+        "what_changed": "",
+        "permalink": "https://www.instagram.com/reel/DYnoFovpEME/"
+      },
+      {
+        "label": "C",
+        "post_id": "17889706359482274",
+        "what_changed": "",
+        "permalink": "https://www.instagram.com/reel/DYnn3MvpEUO/"
+      },
+      {
+        "label": "D",
+        "post_id": "18050781950778024",
+        "what_changed": "",
+        "permalink": "https://www.instagram.com/reel/DYnnnxOpXL1/"
+      }
+    ],
+    "winner_id": null,
+    "insight": "",
+    "decided_at": null
+  },
+  "exp_002": {
+    "name": "Una camisa se desgasta",
+    "variable_tested": "",
+    "content_type": "atracción",
+    "status": "pendiente",
+    "created_at": "2026-07-16",
+    "variants": [
+      {
+        "label": "A",
+        "post_id": "18111682228909243",
+        "what_changed": "",
+        "permalink": "https://www.instagram.com/reel/DYz1cwzgxoz/"
+      },
+      {
+        "label": "B",
+        "post_id": "17899695972444787",
+        "what_changed": "",
+        "permalink": "https://www.instagram.com/reel/DYz3P8dgUgk/"
+      },
+      {
+        "label": "C",
+        "post_id": "18592311037047737",
+        "what_changed": "",
+        "permalink": "https://www.instagram.com/reel/DYz4K60A-B0/"
+      },
+      {
+        "label": "D",
+        "post_id": "18125053114724401",
+        "what_changed": "",
+        "permalink": "https://www.instagram.com/reel/DYz3w13AkWl/"
+      },
+      {
+        "label": "E",
+        "post_id": "18077893769345895",
+        "what_changed": "",
+        "permalink": "https://www.instagram.com/reel/DYz3cuAgcZ7/"
+      },
+      {
+        "label": "F",
+        "post_id": "17974437099044591",
+        "what_changed": "",
+        "permalink": "https://www.instagram.com/reel/DYz37ovgI-z/"
+      }
+    ],
+    "winner_id": null,
+    "insight": "",
+    "decided_at": null
+  }
+}
