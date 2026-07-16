@@ -1,7 +1,7 @@
 {
   "exp_001": {
     "name": "Estos relojes te hacen ver pobre",
-    "variable_tested": "",
+    "variable_tested": "Hook hablado y hook visual.",
     "content_type": "atracción",
     "status": "pendiente",
     "created_at": "2026-07-16",
