@@ -126,12 +126,12 @@ def parse_ig_timestamp(ts):
     except Exception:
         return None
 
-def save_snapshot(posts):
+def save_snapshot(posts, followers=0):
     """Guarda un snapshot con timestamp exacto por post."""
     colombia       = timezone(timedelta(hours=-5))
     now_col        = datetime.now(colombia)
     today          = now_col.strftime("%Y-%m-%d")
-    snapshot_taken = datetime.now(timezone.utc).isoformat()  # hora exacta en UTC para cálculo de horas
+    snapshot_taken = datetime.now(timezone.utc).isoformat()
 
     if SNAPSHOTS.exists():
         history = json.loads(SNAPSHOTS.read_text())
@@ -142,9 +142,10 @@ def save_snapshot(posts):
         print(f"  ℹ️  Snapshot de {today} ya existe — se omite duplicado.")
         return history
 
-    history[today] = {
-        "_meta": {"taken_at": snapshot_taken},
-    }
+    meta = {"taken_at": snapshot_taken}
+    if followers:
+        meta["followers_count"] = followers
+    history[today] = {"_meta": meta}
     for post in posts:
         pid = post["id"]
         history[today][pid] = {
@@ -268,6 +269,70 @@ def build_growth_data_all(history):
     result.sort(key=lambda x: x["published_at"] or x["published"], reverse=True)
     return result
 
+# ── Follower growth ───────────────────────────────────────────
+
+def build_follower_series(history, all_posts):
+    """
+    Construye serie diaria de seguidores ganados a partir de los _meta de cada snapshot.
+    Solo incluye días con followers_count registrado (desde que se implementó el tracking).
+    Agrupa por día Colombia sumando deltas de los 4 slots de 6h.
+    """
+    from datetime import datetime, timezone, timedelta
+
+    COL = timezone(timedelta(hours=-5))
+
+    # Recopilar snapshots con followers_count, ordenados
+    snaps = []
+    for key in sorted(history.keys()):
+        if key.startswith("_"):
+            continue
+        meta = history[key].get("_meta", {})
+        fc = meta.get("followers_count")
+        if fc is None:
+            continue
+        taken_str = meta.get("taken_at", "")
+        try:
+            taken_utc = datetime.fromisoformat(taken_str.replace("Z", "+00:00"))
+            taken_col = taken_utc.astimezone(COL)
+        except Exception:
+            continue
+        snaps.append({"key": key, "followers": fc, "taken": taken_col})
+
+    if len(snaps) < 2:
+        return []
+
+    # Calcular delta entre snapshots consecutivos → agrupar por día Colombia
+    by_day = {}
+    for i in range(1, len(snaps)):
+        prev, curr = snaps[i-1], snaps[i]
+        delta = curr["followers"] - prev["followers"]
+        day = curr["taken"].strftime("%Y-%m-%d")
+        if day not in by_day:
+            by_day[day] = {"delta": 0, "followers": curr["followers"]}
+        by_day[day]["delta"] += delta
+
+    if not by_day:
+        return []
+
+    # Baseline: mediana de los deltas diarios (robusto a picos)
+    deltas = [v["delta"] for v in by_day.values()]
+    sorted_deltas = sorted(deltas)
+    mid = len(sorted_deltas) // 2
+    baseline = sorted_deltas[mid] if len(sorted_deltas) % 2 else (sorted_deltas[mid-1] + sorted_deltas[mid]) / 2
+
+    result = []
+    for day in sorted(by_day.keys()):
+        d = by_day[day]
+        result.append({
+            "date":      day,
+            "delta":     d["delta"],
+            "followers": d["followers"],
+            "baseline":  round(baseline, 1),
+            "organic":   round(max(0, d["delta"] - baseline), 1),
+        })
+
+    return result
+
 # ── Tags ─────────────────────────────────────────────────────
 
 CATEGORIES = ["atracción", "conexión", "conversión", "sin etiquetar"]
@@ -317,12 +382,15 @@ def build_html(perfil, insights, posts, demo, history):
     saves    = ins28.get("saves", 0)
 
     raw_tags  = load_tags()
-    pinned_ids = raw_tags.pop("_pinned", [])   # extrae lista de fijados, no es una tag real
+    pinned_ids = raw_tags.pop("_pinned", [])
     tags       = raw_tags
     pinned_set = set(pinned_ids)
     eng_rate = round(inter / reach * 100, 2) if reach else 0
 
     reach_labels = json.dumps([d["date"] for d in ins28.get("reach_daily", [])])
+
+    # ── Follower growth — delta entre snapshots ───────────────
+    follower_series = build_follower_series(history, [])
     reach_values = json.dumps([d["value"] for d in ins28.get("reach_daily", [])])
     insights_json = json.dumps(insights_by_window)
 
@@ -357,7 +425,8 @@ def build_html(perfil, insights, posts, demo, history):
     colors_json    = json.dumps(COLORS)
     categories_json = json.dumps(CATEGORIES)
     tag_colors_json = json.dumps(TAG_COLORS)
-    pinned_json    = json.dumps(list(pinned_set))
+    pinned_json         = json.dumps(list(pinned_set))
+    follower_series_json = json.dumps(follower_series, ensure_ascii=False)
 
     # Número de snapshots
     num_snapshots = len(history)
@@ -587,6 +656,21 @@ def build_html(perfil, insights, posts, demo, history):
       Aún no hay posts rastreados desde {first_snapshot}. 📅
     </p>
     <canvas id="rankingChart" style="max-height:380px"></canvas>
+  </div>
+
+  <!-- FOLLOWER GROWTH -->
+  <div class="card" id="followerGrowthCard">
+    <h2 style="margin-top:0">Seguidores ganados por día
+      <small style="font-size:.65rem;color:#555588;font-weight:400;text-transform:none;letter-spacing:0">
+        — orgánico estimado vs baseline de pauta constante
+      </small>
+    </h2>
+    <div id="followerNoData" style="display:none;color:#555588;font-size:.8rem;padding:20px 0;text-align:center">
+      Aún no hay suficientes snapshots con conteo de seguidores.<br>
+      Los datos se acumularán a partir del próximo cron. 📅
+    </div>
+    <canvas id="followerChart" style="max-height:220px"></canvas>
+    <p id="followerNote" style="font-size:.68rem;color:#444466;margin-top:10px;text-align:center"></p>
   </div>
 
   <!-- INSIGHTS -->
@@ -1037,6 +1121,109 @@ function renderInsights() {{
 // se vuelven a llamar desde loadTagsFromServer() al completar
 loadTagsFromServer();
 
+// ── Follower growth ──────────────────────────────────────────
+const FOLLOWER_SERIES = {follower_series_json};
+
+(function renderFollowerChart() {{
+  if (!FOLLOWER_SERIES || FOLLOWER_SERIES.length < 2) {{
+    document.getElementById("followerNoData").style.display = "block";
+    document.getElementById("followerChart").style.display  = "none";
+    return;
+  }}
+
+  const labels   = FOLLOWER_SERIES.map(d => d.date.slice(5));  // MM-DD
+  const total    = FOLLOWER_SERIES.map(d => d.delta);
+  const organic  = FOLLOWER_SERIES.map(d => d.organic);
+  const baseline = FOLLOWER_SERIES[0].baseline;
+
+  // Calcular posts publicados por día para anotaciones
+  const postsByDay = {{}};
+  ALL_POSTS_VU.forEach(p => {{
+    if (p.published) {{
+      const day = p.published.slice(5);  // MM-DD
+      if (!postsByDay[day]) postsByDay[day] = [];
+      postsByDay[day].push(shortCap(p.caption, 35));
+    }}
+  }});
+
+  // Nota resumen
+  const avgOrganic = Math.round(organic.reduce((a,b)=>a+b,0) / organic.length);
+  const maxOrganic = Math.max(...organic);
+  const maxDay     = labels[organic.indexOf(maxOrganic)];
+  document.getElementById("followerNote").textContent =
+    `Baseline pauta: ~${{Math.round(baseline)}} seguidores/día · Orgánico estimado promedio: ~${{avgOrganic}}/día · Pico orgánico: +${{Math.round(maxOrganic)}} el ${{maxDay}}`;
+
+  new Chart(document.getElementById("followerChart").getContext("2d"), {{
+    type: "bar",
+    data: {{
+      labels,
+      datasets: [
+        {{
+          label: "Baseline pauta",
+          data: FOLLOWER_SERIES.map(() => baseline),
+          type: "line",
+          borderColor: "#fb8c00",
+          backgroundColor: "transparent",
+          borderDash: [5, 4],
+          borderWidth: 1.5,
+          pointRadius: 0,
+          order: 0
+        }},
+        {{
+          label: "Orgánico estimado",
+          data: organic,
+          backgroundColor: "#43a04799",
+          borderColor: "#43a047",
+          borderWidth: 1,
+          borderRadius: 3,
+          order: 1
+        }},
+        {{
+          label: "Pauta (baseline)",
+          data: FOLLOWER_SERIES.map(d => Math.min(d.delta, baseline)),
+          backgroundColor: "#fb8c0044",
+          borderColor: "transparent",
+          borderWidth: 0,
+          borderRadius: 3,
+          order: 2
+        }}
+      ]
+    }},
+    options: {{
+      responsive: true,
+      interaction: {{ mode: "index", intersect: false }},
+      plugins: {{
+        legend: {{ display: true, labels: {{ color: "#9090cc", font: {{ size: 11 }}, boxWidth: 14 }} }},
+        tooltip: {{
+          backgroundColor: "#1a1a2e", borderColor: "#3a3a5c", borderWidth: 1,
+          titleColor: "#fff", bodyColor: "#cccce0",
+          callbacks: {{
+            afterBody: items => {{
+              const day = labels[items[0].dataIndex];
+              const posts = postsByDay[day];
+              if (posts && posts.length) return ["", "📸 Publicado:", ...posts.map(p => "  · " + p)];
+              return [];
+            }},
+            footer: items => {{
+              const d = FOLLOWER_SERIES[items[0].dataIndex];
+              return `Total del día: +${{d.delta}} seguidores`;
+            }}
+          }}
+        }}
+      }},
+      scales: {{
+        x: {{ stacked: true, ticks: {{ color: "#8888aa", maxRotation: 45 }}, grid: {{ color: "#1e1e38" }} }},
+        y: {{
+          stacked: true,
+          title: {{ display: true, text: "seguidores ganados", color: "#8888aa" }},
+          ticks: {{ color: "#8888aa" }},
+          grid: {{ color: "#1e1e38" }}
+        }}
+      }}
+    }}
+  }});
+}})();
+
 // ── Modal de detalle por post ────────────────────────────────
 let modalChart   = null;
 let modalPost    = null;
@@ -1254,7 +1441,7 @@ def main():
         n = len([k for k in merged if not k.startswith("_")])
         print(f"  ✅ {n} snapshots (GitHub + local)")
 
-    history = save_snapshot(posts)
+    history = save_snapshot(posts, followers=perfil.get("followers_count", 0))
 
     print("  → Generando HTML...")
     html = build_html(perfil, insights, posts, demo, history)

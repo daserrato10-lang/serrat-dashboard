@@ -250,14 +250,19 @@ def main():
             print(f"  ℹ️  Snapshot {snap_key} ya existía — omitiendo.")
             return
 
-        print("  → Escribiendo snapshot en GitHub...")
-        num_snaps = len([k for k in history if not k.startswith("_")])
-        gh_write_snapshots(history, sha, f"snapshot: {snap_key} ({len(posts)} posts)")
-
         print("  → Obteniendo datos adicionales para el dashboard...")
         perfil   = gd.get_perfil()
         insights = gd.get_all_insights()
         demo     = gd.get_demografia()
+
+        # Guardar followers_count en el _meta antes de escribir a GitHub
+        followers_now = perfil.get("followers_count", 0)
+        if followers_now:
+            history[snap_key]["_meta"]["followers_count"] = followers_now
+
+        print("  → Escribiendo snapshot en GitHub...")
+        num_snaps = len([k for k in history if not k.startswith("_")])
+        gh_write_snapshots(history, sha, f"snapshot: {snap_key} ({len(posts)} posts)")
 
         print("  → Generando y subiendo dashboard...")
         html     = gd.build_html(perfil, insights, posts, demo, history)
