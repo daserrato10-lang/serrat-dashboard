@@ -260,6 +260,12 @@ def main():
         if followers_now:
             history[snap_key]["_meta"]["followers_count"] = followers_now
 
+        # Guardar website_clicks y profile_views (ventana 1d) en _meta
+        biz = gd.get_daily_business_metrics()
+        for k, v in biz.items():
+            if v:
+                history[snap_key]["_meta"][k] = v
+
         print("  → Escribiendo snapshot en GitHub...")
         num_snaps = len([k for k in history if not k.startswith("_")])
         gh_write_snapshots(history, sha, f"snapshot: {snap_key} ({len(posts)} posts)")

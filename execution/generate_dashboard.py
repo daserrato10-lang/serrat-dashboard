@@ -269,6 +269,25 @@ def build_growth_data_all(history):
     result.sort(key=lambda x: x["published_at"] or x["published"], reverse=True)
     return result
 
+def get_daily_business_metrics():
+    """Website clicks y profile views de las últimas 24 horas (ventana 1d)."""
+    now_ts  = int(datetime.now(timezone.utc).timestamp())
+    day1_ts = now_ts - 86400
+    try:
+        data = ig_get(f"{IG_ID}/insights", {
+            "metric": "website_clicks,profile_views",
+            "metric_type": "total_value",
+            "period": "day",
+            "since": day1_ts, "until": now_ts
+        })
+        result = {}
+        for m in data.get("data", []):
+            result[m["name"]] = (m.get("total_value") or {}).get("value", 0)
+        return result
+    except Exception as e:
+        print(f"  ⚠️  No se pudo obtener métricas diarias de negocio: {e}")
+        return {}
+
 # ── Follower growth ───────────────────────────────────────────
 
 def build_follower_series(history, all_posts):
@@ -333,6 +352,35 @@ def build_follower_series(history, all_posts):
 
     return result
 
+# ── Website clicks / Profile views serie ─────────────────────
+
+def build_clicks_series(history):
+    """
+    Construye serie diaria de website_clicks y profile_views
+    desde el _meta de cada snapshot (acumula a partir de cuando
+    take_snapshot.py empieza a guardarlos).
+    """
+    COL = timezone(timedelta(hours=-5))
+    by_day = {}
+    for key in sorted(history.keys()):
+        if key.startswith("_"):
+            continue
+        meta = history[key].get("_meta", {})
+        wc   = meta.get("website_clicks")
+        pv   = meta.get("profile_views")
+        if wc is None and pv is None:
+            continue
+        taken_str = meta.get("taken_at", "")
+        try:
+            taken_utc = datetime.fromisoformat(taken_str.replace("Z", "+00:00"))
+            day       = taken_utc.astimezone(COL).strftime("%Y-%m-%d")
+        except Exception:
+            day = key[:10]
+        # El valor más reciente del día gana (sobrescribe slots anteriores)
+        by_day[day] = {"website_clicks": wc or 0, "profile_views": pv or 0}
+
+    return [{"date": d, **v} for d, v in sorted(by_day.items())]
+
 # ── Tags ─────────────────────────────────────────────────────
 
 CATEGORIES = ["atracción", "conexión", "conversión", "sin etiquetar"]
@@ -394,6 +442,9 @@ def build_html(perfil, insights, posts, demo, history):
     reach_values = json.dumps([d["value"] for d in ins28.get("reach_daily", [])])
     insights_json = json.dumps(insights_by_window)
 
+    # ── Website clicks / Profile views — desde snapshots ─────
+    clicks_series = build_clicks_series(history)
+
     # Growth data — ranking (solo posts desde primer snapshot) y modal (todos)
     growth_posts   = build_growth_data(history)
     all_posts_data = build_growth_data_all(history)
@@ -425,8 +476,9 @@ def build_html(perfil, insights, posts, demo, history):
     colors_json    = json.dumps(COLORS)
     categories_json = json.dumps(CATEGORIES)
     tag_colors_json = json.dumps(TAG_COLORS)
-    pinned_json         = json.dumps(list(pinned_set))
+    pinned_json          = json.dumps(list(pinned_set))
     follower_series_json = json.dumps(follower_series, ensure_ascii=False)
+    clicks_series_json   = json.dumps(clicks_series, ensure_ascii=False)
 
     # Número de snapshots
     num_snapshots = len(history)
@@ -673,6 +725,25 @@ def build_html(perfil, insights, posts, demo, history):
     <p id="followerNote" style="font-size:.68rem;color:#444466;margin-top:10px;text-align:center"></p>
   </div>
 
+  <!-- WEBSITE CLICKS -->
+  <div class="card" id="clicksCard">
+    <h2 style="margin-top:0">Clics al sitio web por día
+      <small style="font-size:.65rem;color:#555588;font-weight:400;text-transform:none;letter-spacing:0">
+        — correlación con contenido publicado · últimos 28 días
+      </small>
+    </h2>
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+      <button class="btn active" id="clicksMetricClicks" onclick="switchClicksMetric('clicks')">Clics al sitio</button>
+      <button class="btn" id="clicksMetricViews" onclick="switchClicksMetric('views')">Visitas de perfil</button>
+      <button class="btn" id="clicksMetricBoth" onclick="switchClicksMetric('both')">Ambas</button>
+    </div>
+    <div id="clicksNoData" style="display:none;color:#555588;font-size:.8rem;padding:20px 0;text-align:center">
+      No hay datos de clics disponibles para este período. 📅
+    </div>
+    <canvas id="clicksChart" style="max-height:240px"></canvas>
+    <p id="clicksNote" style="font-size:.68rem;color:#444466;margin-top:10px;text-align:center"></p>
+  </div>
+
   <!-- INSIGHTS -->
   <h2>¿Qué funciona mejor? <small style="font-size:.65rem;color:#555588;font-weight:400;text-transform:none;letter-spacing:0">— alcance promedio a las 48h por categoría</small></h2>
   <div class="insight-grid">
@@ -857,6 +928,7 @@ async function loadTagsFromServer() {{
   applyPinBtns();
   renderRanking();
   renderInsights();
+  if (window.renderClicksChart) window.renderClicksChart(window._clicksMetric || "clicks");
 }}
 
 function shortCap(caption, len) {{
@@ -1389,6 +1461,140 @@ document.querySelectorAll("#modalMetricBtns .btn").forEach(btn => {{
 
 // Cerrar con Escape
 document.addEventListener("keydown", e => {{ if (e.key === "Escape") closeModal(); }});
+
+// ── Clics al sitio web ───────────────────────────────────────
+// CLICKS_SERIES: [{{date, website_clicks, profile_views}}]
+// Datos acumulados desde snapshots Railway (desde jul 16+)
+const CLICKS_SERIES = {clicks_series_json};
+
+(function initClicksChart() {{
+  const hasData   = CLICKS_SERIES && CLICKS_SERIES.length > 0;
+  const hasClicks = hasData && CLICKS_SERIES.some(d => d.website_clicks > 0);
+  const hasViews  = hasData && CLICKS_SERIES.some(d => d.profile_views  > 0);
+
+  if (!hasData) {{
+    document.getElementById("clicksNoData").style.display = "block";
+    document.getElementById("clicksChart").style.display  = "none";
+    document.getElementById("clicksMetricClicks").style.display = "none";
+    document.getElementById("clicksMetricViews").style.display  = "none";
+    document.getElementById("clicksMetricBoth").style.display   = "none";
+    return;
+  }}
+  if (!hasClicks) document.getElementById("clicksMetricClicks").style.display = "none";
+  if (!hasViews)  document.getElementById("clicksMetricViews").style.display  = "none";
+  if (!hasClicks || !hasViews) document.getElementById("clicksMetricBoth").style.display = "none";
+
+  window._clicksChart  = null;
+  window._clicksMetric = hasClicks ? "clicks" : "views";
+
+  window.renderClicksChart = function(metric) {{
+    window._clicksMetric = metric;
+
+    // Posts publicados por día — con tags actualizados al momento del render
+    const postsByDay = {{}};
+    ALL_POSTS_VU.forEach(p => {{
+      if (!p.published) return;
+      if (!postsByDay[p.published]) postsByDay[p.published] = [];
+      const tag  = (_tags[p.id] || p.tag || "sin etiquetar");
+      const icon = tag === "atracción" ? "🔴" : tag === "conexión" ? "🟢" : tag === "conversión" ? "🔵" : "⚪";
+      postsByDay[p.published].push(`${{icon}} ${{shortCap(p.caption, 40)}}`);
+    }});
+
+    const labels = CLICKS_SERIES.map(d => d.date);
+    let datasets, noteText;
+
+    if (metric === "clicks") {{
+      const vals  = CLICKS_SERIES.map(d => d.website_clicks);
+      const total = vals.reduce((a,b) => a+b, 0);
+      datasets = [{{
+        label: "Clics al sitio",
+        data: vals,
+        backgroundColor: "#fb8c0099",
+        borderColor: "#fb8c00",
+        borderWidth: 1.5,
+        borderRadius: 4
+      }}];
+      noteText = `Total: ${{total.toLocaleString("es-CO")}} clics · promedio: ${{Math.round(total/vals.length)}}/día`;
+    }} else if (metric === "views") {{
+      const vals  = CLICKS_SERIES.map(d => d.profile_views);
+      const total = vals.reduce((a,b) => a+b, 0);
+      datasets = [{{
+        label: "Visitas de perfil",
+        data: vals,
+        backgroundColor: "#8e24aa99",
+        borderColor: "#8e24aa",
+        borderWidth: 1.5,
+        borderRadius: 4
+      }}];
+      noteText = `Total: ${{total.toLocaleString("es-CO")}} visitas de perfil · promedio: ${{Math.round(total/vals.length)}}/día`;
+    }} else {{
+      datasets = [
+        {{
+          label: "Clics al sitio",
+          data: CLICKS_SERIES.map(d => d.website_clicks),
+          backgroundColor: "#fb8c0099",
+          borderColor: "#fb8c00",
+          borderWidth: 1.5, borderRadius: 4, yAxisID: "y"
+        }},
+        {{
+          label: "Visitas de perfil",
+          data: CLICKS_SERIES.map(d => d.profile_views),
+          type: "line",
+          borderColor: "#8e24aa",
+          backgroundColor: "transparent",
+          borderWidth: 2, pointRadius: 3, tension: 0.3, yAxisID: "y2"
+        }}
+      ];
+      noteText = "Barras: clics al sitio (eje izq) · Línea: visitas de perfil (eje der)";
+    }}
+
+    document.getElementById("clicksNote").textContent = noteText;
+
+    const scales = {{
+      x: {{ ticks: {{ color: "#8888aa", maxTicksLimit: 20, maxRotation: 45 }}, grid: {{ color: "#1e1e38" }} }},
+      y: {{ ticks: {{ color: "#8888aa" }}, grid: {{ color: "#1e1e38" }} }}
+    }};
+    if (metric === "both") {{
+      scales.y2 = {{ position: "right", ticks: {{ color: "#8e24aa" }}, grid: {{ drawOnChartArea: false }} }};
+    }}
+
+    if (window._clicksChart) window._clicksChart.destroy();
+    window._clicksChart = new Chart(document.getElementById("clicksChart").getContext("2d"), {{
+      type: "bar",
+      data: {{ labels, datasets }},
+      options: {{
+        responsive: true,
+        interaction: {{ mode: "index", intersect: false }},
+        plugins: {{
+          legend: {{ display: metric === "both", labels: {{ color: "#9090cc", font: {{ size: 11 }}, boxWidth: 14 }} }},
+          tooltip: {{
+            backgroundColor: "#1a1a2e", borderColor: "#3a3a5c", borderWidth: 1,
+            titleColor: "#fff", bodyColor: "#cccce0",
+            callbacks: {{
+              afterBody: items => {{
+                const day = labels[items[0].dataIndex];
+                const posts = postsByDay[day];
+                if (posts && posts.length) return ["", "📸 Publicado ese día:", ...posts.map(p => "  " + p)];
+                return [];
+              }}
+            }}
+          }}
+        }},
+        scales
+      }}
+    }});
+  }};
+
+  window.renderClicksChart(window._clicksMetric);
+}})();
+
+window.switchClicksMetric = function(metric) {{
+  document.querySelectorAll("#clicksCard .btn").forEach(b => b.classList.remove("active"));
+  const idMap = {{ clicks: "clicksMetricClicks", views: "clicksMetricViews", both: "clicksMetricBoth" }};
+  const el = document.getElementById(idMap[metric]);
+  if (el) el.classList.add("active");
+  window.renderClicksChart(metric);
+}};
 </script>
 </body>
 </html>"""
