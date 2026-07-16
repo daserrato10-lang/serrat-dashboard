@@ -11,6 +11,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 GH_TOKEN     = os.environ.get("GH_TOKEN", "")
 GH_REPO      = os.environ.get("GH_REPO", "")
 GH_TAGS_PATH = "post_tags.json"
+GH_EXP_PATH  = "experiments.json"
 GH_DASH_PATH = "docs/index.html"
 BASE_GH      = "https://api.github.com"
 PORT         = int(os.environ.get("PORT", 8080))
@@ -93,6 +94,13 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 tags = {}
             self.send_json(200, tags)
+        elif self.path == "/experiments":
+            try:
+                raw, _ = gh_read(GH_EXP_PATH)
+                exps = json.loads(raw)
+            except Exception:
+                exps = {}
+            self.send_json(200, exps)
         elif self.path == "/health":
             self.send_json(200, {"ok": True})
         else:
@@ -100,7 +108,30 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
 
     def do_POST(self):
-        if self.path == "/save-tags":
+        if self.path == "/save-experiment":
+            length = int(self.headers.get("Content-Length", 0))
+            body   = self.rfile.read(length)
+            try:
+                payload  = json.loads(body)
+                exp_id   = payload.get("id")
+                exp_data = payload.get("data")
+                if not exp_id or exp_data is None:
+                    raise ValueError("Se requieren 'id' y 'data'")
+                try:
+                    existing_raw, sha = gh_read(GH_EXP_PATH)
+                    experiments = json.loads(existing_raw)
+                except urllib.error.HTTPError as e:
+                    if e.code == 404:
+                        experiments, sha = {}, None
+                    else:
+                        raise
+                experiments[exp_id] = exp_data
+                content = json.dumps(experiments, ensure_ascii=False, indent=2)
+                gh_write(GH_EXP_PATH, content, sha, f"lab: update {exp_id}")
+                self.send_json(200, {"ok": True})
+            except Exception as e:
+                self.send_json(500, {"error": str(e)})
+        elif self.path == "/save-tags":
             length = int(self.headers.get("Content-Length", 0))
             body   = self.rfile.read(length)
             try:

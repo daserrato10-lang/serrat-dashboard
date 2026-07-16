@@ -17,7 +17,8 @@ ROOT      = Path(__file__).parent.parent
 ENV       = ROOT / ".env"
 OUT       = ROOT / ".tmp" / "dashboard.html"
 SNAPSHOTS = ROOT / ".tmp" / "post_snapshots.json"
-TAGS_FILE = ROOT / "post_tags.json"
+TAGS_FILE        = ROOT / "post_tags.json"
+EXPERIMENTS_FILE = ROOT / "experiments.json"
 
 def load_env():
     env = {}
@@ -393,7 +394,179 @@ def load_tags():
 def save_tags_file(tags):
     TAGS_FILE.write_text(json.dumps(tags, ensure_ascii=False, indent=2))
 
+def load_experiments():
+    if EXPERIMENTS_FILE.exists():
+        return json.loads(EXPERIMENTS_FILE.read_text())
+    return {}
+
 # ── HTML ──────────────────────────────────────────────────────
+
+# Lab JS template — regular string so JS {} don't need escaping
+_LAB_JS = """
+// ── Lab ─────────────────────────────────────────────────────────────────────
+const EXPERIMENTS_INIT = __EXPS__;
+const LAB_REACH = __REACH__;
+let _experiments = null;
+
+async function _loadExpFromServer() {
+  try { const r = await fetch("/experiments"); if (!r.ok) return null; return await r.json(); }
+  catch(e) { return null; }
+}
+
+function renderLab(exps) {
+  _experiments = JSON.parse(JSON.stringify(exps));
+  const el = document.getElementById("labExperiments");
+  if (!el) return;
+  const ids = Object.keys(exps);
+  if (!ids.length) {
+    el.innerHTML = '<p style="color:#555588;font-size:.82rem;padding:20px 0">Sin experimentos. Pídele a Claude que registre los posts de prueba como experimento.</p>';
+    return;
+  }
+  el.innerHTML = ids.map(id => _buildExpCard(id, exps[id])).join("");
+  el.querySelectorAll("[data-lab-field]").forEach(function(inp) {
+    inp.addEventListener("blur", function() {
+      var card = this.closest("[data-exp-id]");
+      if (!card) return;
+      var expId = card.dataset.expId;
+      var field = this.dataset.labField;
+      var vi    = this.dataset.varIdx;
+      if (vi !== undefined) {
+        _experiments[expId].variants[parseInt(vi)][field] = this.value.trim();
+      } else {
+        _experiments[expId][field] = this.value.trim();
+      }
+      _doSaveExp(expId);
+    });
+  });
+}
+
+function _buildExpCard(id, exp) {
+  var STATUS = {
+    pendiente: {label:"⏳ Pendiente", color:"#fb8c00"},
+    en_curso:  {label:"🔬 En curso",  color:"#43a047"},
+    listo:     {label:"🔍 Listo para analizar", color:"#5c6bc0"},
+    cerrado:   {label:"✅ Cerrado",   color:"#555577"}
+  };
+  var s        = STATUS[exp.status] || STATUS.pendiente;
+  var isClosed = exp.status === "cerrado";
+  var winner   = exp.winner_id;
+  var emojis   = ["🥇","🥈","🥉","·","·","·"];
+
+  var sorted = (exp.variants || []).map(function(v, i) {
+    var r = LAB_REACH[v.post_id] || {};
+    return {label:v.label, post_id:v.post_id, what_changed:v.what_changed, permalink:v.permalink,
+            idx:i, reach:r.reach||0, saves:r.saves||0, shares:r.shares||0};
+  }).sort(function(a,b) { return b.reach - a.reach; });
+
+  var maxR = sorted.length && sorted[0].reach ? sorted[0].reach : 1;
+
+  var varCards = sorted.map(function(v, rank) {
+    var isW = winner === v.post_id;
+    var bar = Math.round(v.reach / maxR * 100);
+    var winBadge  = isW ? '<span class="lab-winner-badge">GANADOR</span>' : "";
+    var markBtn   = (!winner && !isClosed)
+      ? '<button class="lab-mark-winner" onclick="markWinner(\'' + id + '\',\'' + v.post_id + '\')">Marcar ganador</button>'
+      : "";
+    var disAttr = isClosed ? " disabled" : "";
+    return '<div class="lab-variant' + (isW ? " lab-winner" : "") + '">'
+      + '<div class="lab-variant-header">'
+      + '<span class="lab-rank">' + (emojis[rank]||"·") + " " + (v.label||"?") + "</span>"
+      + winBadge + markBtn
+      + '<a href="' + (v.permalink||"#") + '" target="_blank" class="lab-link">ver ↗</a>'
+      + "</div>"
+      + '<div class="lab-reach-bar"><div class="lab-reach-fill" style="width:' + bar + '%"></div></div>'
+      + '<div class="lab-metrics">'
+      + "<span>Reach: <strong>" + v.reach.toLocaleString() + "</strong></span>"
+      + "<span>Guardados: <strong>" + v.saves + "</strong></span>"
+      + "<span>Compartidos: <strong>" + v.shares + "</strong></span>"
+      + "</div>"
+      + '<label class="lab-field-label" style="margin-top:8px">¿Qué cambió en esta variante?</label>'
+      + '<textarea class="lab-field" data-lab-field="what_changed" data-var-idx="' + v.idx + '"'
+      + ' placeholder="ej: hook visual — reloj en muñeca en vez de reloj sobre superficie" rows="2"' + disAttr + ">"
+      + (v.what_changed||"") + "</textarea>"
+      + "</div>";
+  }).join("");
+
+  var expNum  = id.replace("exp_","").replace(/^0+/,"");
+  var closeBtn = !isClosed
+    ? '<button class="lab-close-btn" onclick="closeExp(\'' + id + '\')">Cerrar experimento</button>'
+    : '<button class="lab-close-btn" style="color:#555588" onclick="reopenExp(\'' + id + '\')">Reabrir</button>';
+
+  return '<div class="card lab-card" data-exp-id="' + id + '"' + (isClosed ? ' style="opacity:.75"' : "") + ">"
+    + '<div class="lab-card-header">'
+    + '<div style="display:flex;align-items:center;gap:8px">'
+    + '<span class="lab-status-badge" style="background:' + s.color + '20;color:' + s.color + ';border:1px solid ' + s.color + '40">' + s.label + "</span>"
+    + '<span class="lab-content-type">' + (exp.content_type||"") + "</span>"
+    + "</div>"
+    + '<span class="lab-card-id">Exp #' + expNum + "</span>"
+    + "</div>"
+    + '<h3 class="lab-exp-name">&ldquo;' + exp.name + "&rdquo;</h3>"
+    + '<div style="margin-bottom:16px">'
+    + '<label class="lab-field-label">Variable testeada</label>'
+    + '<input class="lab-field" data-lab-field="variable_tested"'
+    + ' placeholder="ej: hook visual — primeros 3 segundos del video"'
+    + ' value="' + (exp.variable_tested||"").replace(/"/g,"&quot;") + '"' + (isClosed ? " disabled" : "") + ">"
+    + "</div>"
+    + '<div class="lab-variants">' + varCards + "</div>"
+    + '<div style="margin-bottom:16px">'
+    + '<label class="lab-field-label">💡 Aprendizaje</label>'
+    + '<textarea class="lab-field lab-insight-field" data-lab-field="insight"'
+    + ' placeholder="ej: hooks con reloj en muñeca generan 3x más reach para audiencia nueva" rows="3"' + (isClosed ? " disabled" : "") + ">"
+    + (exp.insight||"") + "</textarea>"
+    + "</div>"
+    + '<div class="lab-actions">' + closeBtn
+    + ' <span id="lab-saved-' + id + '" style="font-size:.68rem;color:#43a047;display:none">✓ guardado</span>'
+    + "</div>"
+    + "</div>";
+}
+
+async function _doSaveExp(expId, cb) {
+  try {
+    var r = await fetch("/save-experiment", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({id: expId, data: _experiments[expId]})
+    });
+    if (r.ok) {
+      var el = document.getElementById("lab-saved-" + expId);
+      if (el) { el.style.display = "inline"; setTimeout(function(){ el.style.display = "none"; }, 2000); }
+      if (cb) cb();
+    }
+  } catch(e) { console.error("Lab save:", e); }
+}
+
+function markWinner(expId, postId) {
+  if (!_experiments[expId]) return;
+  _experiments[expId].winner_id = postId;
+  _experiments[expId].status = "listo";
+  _doSaveExp(expId, function(){ renderLab(_experiments); });
+}
+
+function closeExp(expId) {
+  if (!_experiments[expId]) return;
+  _experiments[expId].status = "cerrado";
+  _experiments[expId].decided_at = new Date().toISOString().slice(0,10);
+  _doSaveExp(expId, function(){ renderLab(_experiments); });
+}
+
+function reopenExp(expId) {
+  if (!_experiments[expId]) return;
+  _experiments[expId].status = "pendiente";
+  _experiments[expId].decided_at = null;
+  _doSaveExp(expId, function(){ renderLab(_experiments); });
+}
+
+function showTab(tab) {
+  document.getElementById("dashContent").style.display = tab === "dash" ? "" : "none";
+  document.getElementById("labContent").style.display  = tab === "lab"  ? "" : "none";
+  document.getElementById("tabBtnDash").classList.toggle("active", tab === "dash");
+  document.getElementById("tabBtnLab").classList.toggle("active",  tab === "lab");
+}
+
+(async function initLab() {
+  var fromServer = await _loadExpFromServer();
+  renderLab(fromServer || EXPERIMENTS_INIT || {});
+})();
+"""
 
 COLORS = [
     "#5c6bc0","#43a047","#fb8c00","#e91e63","#00897b",
@@ -479,6 +652,21 @@ def build_html(perfil, insights, posts, demo, history):
     pinned_json          = json.dumps(list(pinned_set))
     follower_series_json = json.dumps(follower_series, ensure_ascii=False)
     clicks_series_json   = json.dumps(clicks_series, ensure_ascii=False)
+
+    # Lab — reach map por post y experimentos
+    lab_reach_map = {}
+    for p in all_posts_data:
+        if p["series"]:
+            last = p["series"][-1]
+            lab_reach_map[p["id"]] = {
+                "reach":  last.get("reach", 0),
+                "saves":  last.get("saved", 0),
+                "shares": last.get("shares", 0),
+            }
+    experiments     = load_experiments()
+    experiments_str = json.dumps(experiments, ensure_ascii=False)
+    lab_reach_str   = json.dumps(lab_reach_map, ensure_ascii=False)
+    lab_js = _LAB_JS.replace("__EXPS__", experiments_str).replace("__REACH__", lab_reach_str)
 
     # Número de snapshots
     num_snapshots = len(history)
@@ -640,6 +828,45 @@ def build_html(perfil, insights, posts, demo, history):
             border-radius:6px;opacity:.4;transition:opacity .15s}}
   .pin-btn:hover{{opacity:1}}
   .pin-btn.pin-active{{opacity:1}}
+  /* Tab nav */
+  .tab-nav{{display:flex;gap:0;margin-bottom:28px;border-bottom:2px solid #2a2a44}}
+  .tab-btn{{padding:10px 24px;background:none;border:none;border-bottom:2px solid transparent;
+            color:#8888aa;cursor:pointer;font-size:.85rem;margin-bottom:-2px;transition:all .15s}}
+  .tab-btn.active{{color:#fff;border-bottom-color:#5c6bc0;font-weight:600}}
+  .tab-btn:hover{{color:#cccce0}}
+  /* Lab */
+  .lab-card{{margin-bottom:20px}}
+  .lab-card-header{{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}}
+  .lab-card-id{{font-size:.7rem;color:#555588}}
+  .lab-status-badge{{font-size:.68rem;padding:3px 10px;border-radius:20px;font-weight:600}}
+  .lab-content-type{{font-size:.68rem;color:#8888aa;margin-left:8px;text-transform:capitalize}}
+  .lab-exp-name{{font-size:.95rem;font-weight:600;color:#fff;margin:0 0 16px}}
+  .lab-field-label{{display:block;font-size:.68rem;color:#8888aa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}}
+  .lab-field{{width:100%;background:#13132a;border:1px solid #2a2a44;border-radius:8px;
+              padding:10px 12px;color:#cccce0;font-size:.8rem;font-family:inherit;
+              resize:vertical;transition:border-color .15s;box-sizing:border-box}}
+  .lab-field:focus{{outline:none;border-color:#5c6bc0}}
+  .lab-field:disabled{{opacity:.5;cursor:not-allowed}}
+  .lab-insight-field{{min-height:70px}}
+  .lab-variants{{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin-bottom:16px}}
+  .lab-variant{{background:#13132a;border:1px solid #2a2a44;border-radius:10px;padding:14px}}
+  .lab-variant.lab-winner{{border-color:#43a04760;background:#43a04710}}
+  .lab-variant-header{{display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap}}
+  .lab-rank{{font-size:.82rem;font-weight:600;color:#fff}}
+  .lab-link{{font-size:.7rem;color:#7986cb;margin-left:auto}}
+  .lab-winner-badge{{font-size:.62rem;background:#43a047;color:#fff;padding:2px 8px;border-radius:10px;font-weight:700}}
+  .lab-mark-winner{{font-size:.62rem;background:none;border:1px solid #3a3a5c;color:#8888aa;
+                    padding:2px 8px;border-radius:10px;cursor:pointer}}
+  .lab-mark-winner:hover{{border-color:#5c6bc0;color:#fff}}
+  .lab-reach-bar{{height:4px;background:#1e1e38;border-radius:2px;margin-bottom:8px;overflow:hidden}}
+  .lab-reach-fill{{height:100%;background:#5c6bc0;border-radius:2px}}
+  .lab-variant.lab-winner .lab-reach-fill{{background:#43a047}}
+  .lab-metrics{{display:flex;gap:12px;font-size:.72rem;color:#8888aa;margin-bottom:10px;flex-wrap:wrap}}
+  .lab-metrics strong{{color:#cccce0}}
+  .lab-actions{{display:flex;align-items:center;gap:12px}}
+  .lab-close-btn{{background:#1e1e38;border:1px solid #3a3a5c;color:#cccce0;
+                  padding:6px 16px;border-radius:20px;cursor:pointer;font-size:.75rem}}
+  .lab-close-btn:hover{{border-color:#5c6bc0;color:#fff}}
 </style>
 </head>
 <body>
@@ -650,6 +877,14 @@ def build_html(perfil, insights, posts, demo, history):
 </div>
 
 <div class="content">
+
+  <!-- TAB NAV -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" id="tabBtnDash" onclick="showTab('dash')">📊 Dashboard</button>
+    <button class="tab-btn" id="tabBtnLab" onclick="showTab('lab')">🧪 Lab</button>
+  </nav>
+
+  <div id="dashContent">
 
   <!-- KPIs estáticos -->
   <h2>Cuenta</h2>
@@ -826,6 +1061,19 @@ def build_html(perfil, insights, posts, demo, history):
       <div class="table-wrap" style="border:none">
         <table><tbody>{city_rows}</tbody></table>
       </div>
+    </div>
+  </div>
+
+  </div><!-- end dashContent -->
+
+  <!-- LAB TAB -->
+  <div id="labContent" style="display:none">
+    <div style="margin:0 0 24px">
+      <h2 style="margin:0 0 6px;font-size:1.05rem;color:#fff;text-transform:none;letter-spacing:0">🧪 Laboratorio de experimentos</h2>
+      <p style="font-size:.78rem;color:#8888aa;margin:0">Documenta qué cambió en cada variante · los datos los muestra el sistema · <strong style="color:#cccce0">juntos llegamos al insight</strong></p>
+    </div>
+    <div id="labExperiments">
+      <p style="color:#555588;font-size:.82rem">Cargando…</p>
     </div>
   </div>
 
@@ -1595,6 +1843,8 @@ window.switchClicksMetric = function(metric) {{
   if (el) el.classList.add("active");
   window.renderClicksChart(metric);
 }};
+
+{lab_js}
 </script>
 </body>
 </html>"""
