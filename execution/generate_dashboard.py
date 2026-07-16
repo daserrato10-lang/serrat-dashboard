@@ -465,7 +465,7 @@ function _buildExpCard(id, exp) {
     var bar = Math.round(v.reach / maxR * 100);
     var winBadge  = isW ? '<span class="lab-winner-badge">GANADOR</span>' : "";
     var markBtn   = (!winner && !isClosed)
-      ? '<button class="lab-mark-winner" onclick="markWinner(\'' + id + '\',\'' + v.post_id + '\')">Marcar ganador</button>'
+      ? '<button class="lab-mark-winner" data-eid="' + id + '" data-pid="' + v.post_id + '" onclick="markWinner(this.dataset.eid,this.dataset.pid)">Marcar ganador</button>'
       : "";
     var disAttr = isClosed ? " disabled" : "";
     return '<div class="lab-variant' + (isW ? " lab-winner" : "") + '">'
@@ -489,8 +489,8 @@ function _buildExpCard(id, exp) {
 
   var expNum  = id.replace("exp_","").replace(/^0+/,"");
   var closeBtn = !isClosed
-    ? '<button class="lab-close-btn" onclick="closeExp(\'' + id + '\')">Cerrar experimento</button>'
-    : '<button class="lab-close-btn" style="color:#555588" onclick="reopenExp(\'' + id + '\')">Reabrir</button>';
+    ? '<button class="lab-close-btn" data-eid="' + id + '" onclick="closeExp(this.dataset.eid)">Cerrar experimento</button>'
+    : '<button class="lab-close-btn" data-eid="' + id + '" style="color:#555588" onclick="reopenExp(this.dataset.eid)">Reabrir</button>';
 
   return '<div class="card lab-card" data-exp-id="' + id + '"' + (isClosed ? ' style="opacity:.75"' : "") + ">"
     + '<div class="lab-card-header">'
