@@ -37,7 +37,7 @@
   },
   "exp_002": {
     "name": "Una camisa se desgasta",
-    "variable_tested": "",
+    "variable_tested": "la idea era el mismo video, con diferente texto en pantalla",
     "content_type": "atracción",
     "status": "pendiente",
     "created_at": "2026-07-16",
