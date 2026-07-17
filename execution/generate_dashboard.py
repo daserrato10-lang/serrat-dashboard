@@ -405,12 +405,81 @@ def load_experiments():
 _LAB_JS = """
 // ── Lab ─────────────────────────────────────────────────────────────────────
 const EXPERIMENTS_INIT = __EXPS__;
-const LAB_REACH = __REACH__;
+const LAB_REACH        = __REACH__;
+const HYPOTHESES       = __HYPS__;
+
+// ── Modal de hipótesis ───────────────────────────────────────
+function openHypModal(hid) {
+  var h = HYPOTHESES.find(function(x){ return x.id === hid; });
+  if (!h) return;
+  var CAT_COLOR = {hook:"#7c6fff",presencia:"#00bcd4",edicion:"#fb8c00",tono:"#00ffa5"};
+  var CAT_LABEL = {hook:"Hook",presencia:"Presencia",edicion:"Edición",tono:"Tono"};
+  var color  = CAT_COLOR[h.category] || "#8888aa";
+  var cat    = CAT_LABEL[h.category] || h.category;
+  var barC   = h.confidence >= 60 ? "#00ffa5" : (h.confidence >= 20 ? "#fb8c00" : "#5c6bc0");
+  var expsHtml = "";
+  if (h.experiments && h.experiments.length) {
+    h.experiments.forEach(function(eid) {
+      var exp = _experiments && _experiments[eid];
+      if (!exp) return;
+      var valid = exp.insight && !exp.insight.startsWith("⚠️");
+      expsHtml += '<div style="background:rgba(255,255,255,.04);border-radius:6px;padding:10px 12px;margin-bottom:8px">'
+        + '<div style="font-size:.68rem;color:#8888aa;margin-bottom:4px">' + (valid?"✅":"⚠️") + " " + eid + " — " + exp.name + '</div>'
+        + '<p style="margin:0;font-size:.77rem;color:#cccce0;line-height:1.45">' + (exp.insight||"Sin insight aún") + '</p>'
+        + '</div>';
+    });
+  } else {
+    expsHtml = '<p style="color:#555588;font-size:.78rem;padding:8px 0">Ningún experimento ha testeado esto aún.</p>';
+  }
+  document.getElementById("hypModalContent").innerHTML =
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
+    + '<span style="font-size:.65rem;background:' + color + '22;color:' + color + ';border-radius:4px;padding:3px 10px;font-weight:600">' + cat + '</span>'
+    + '<button onclick="closeHypModal()" style="background:none;border:none;color:#8888aa;font-size:1.2rem;cursor:pointer;line-height:1">✕</button>'
+    + '</div>'
+    + '<h3 style="font-size:.92rem;color:#eeeeff;margin:0 0 12px;line-height:1.4">' + h.title + '</h3>'
+    + '<div style="background:#0d0d1a;border-radius:5px;height:6px;overflow:hidden;margin-bottom:5px">'
+    + '<div style="width:' + h.confidence + '%;height:100%;background:' + barC + ';border-radius:5px"></div></div>'
+    + '<div style="display:flex;justify-content:space-between;margin-bottom:16px">'
+    + '<span style="font-size:.68rem;color:#555588">Certeza: <strong style="color:' + barC + '">' + h.confidence + '%</strong></span>'
+    + '<span style="font-size:.68rem;color:#555588">' + h.confirmed + '/5 experimentos</span>'
+    + '</div>'
+    + '<p style="font-size:.79rem;color:#aaaacc;line-height:1.55;margin-bottom:14px">' + h.description + '</p>'
+    + '<div style="background:rgba(0,255,165,.06);border-left:3px solid #00ffa5;border-radius:4px;padding:10px 14px;margin-bottom:10px">'
+    + '<div style="font-size:.65rem;color:#00ffa566;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Si se confirma</div>'
+    + '<p style="margin:0;font-size:.79rem;color:#cccce0;line-height:1.5">' + h.implication + '</p></div>'
+    + '<div style="background:rgba(251,140,0,.07);border-left:3px solid #fb8c00;border-radius:4px;padding:10px 14px;margin-bottom:14px">'
+    + '<div style="font-size:.65rem;color:#fb8c066;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Caveat</div>'
+    + '<p style="margin:0;font-size:.77rem;color:#ffbb55;line-height:1.5">' + h.caveat + '</p></div>'
+    + '<div style="font-size:.68rem;font-weight:700;color:#555588;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Experimentos que la testean</div>'
+    + expsHtml;
+  document.getElementById("hypModal").style.display = "flex";
+}
+function closeHypModal() { document.getElementById("hypModal").style.display = "none"; }
+
+async function activateDesign(designId) {
+  try {
+    var r = await fetch("/save-experiment", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({id:"_active", data:{design: designId}})
+    });
+    if (r.ok) location.reload();
+  } catch(e) { console.error("activateDesign:", e); }
+}
 let _experiments = null;
 
 async function _loadExpFromServer() {
   try { const r = await fetch("/experiments"); if (!r.ok) return null; return await r.json(); }
   catch(e) { return null; }
+}
+
+function _mkMetric(label, field, v, disAttr) {
+  var val = (v[field] !== null && v[field] !== undefined) ? v[field] : "";
+  return '<div>'
+    + '<div style="font-size:.61rem;color:#8888aa;margin-bottom:3px">' + label + '</div>'
+    + '<input type="number" step="0.1" class="lab-field" style="text-align:center;padding:5px 6px;font-size:.78rem"'
+    + ' data-lab-field="mm_' + field + '" data-var-idx="' + v.idx + '"'
+    + ' placeholder="—"' + (val !== "" ? ' value="' + val + '"' : '') + disAttr + '>'
+    + '</div>';
 }
 
 function renderLab(exps) {
@@ -430,7 +499,13 @@ function renderLab(exps) {
       var expId = card.dataset.expId;
       var field = this.dataset.labField;
       var vi    = this.dataset.varIdx;
-      if (vi !== undefined) {
+      if (vi !== undefined && field.startsWith("mm_")) {
+        var realField = field.replace("mm_", "");
+        var variant   = _experiments[expId].variants[parseInt(vi)];
+        var val = this.value.trim();
+        variant[realField] = val !== "" ? parseFloat(val) : null;
+        variant.read_at    = new Date().toISOString();
+      } else if (vi !== undefined) {
         _experiments[expId].variants[parseInt(vi)][field] = this.value.trim();
       } else {
         _experiments[expId][field] = this.value.trim();
@@ -484,6 +559,15 @@ function _buildExpCard(id, exp) {
       + '<textarea class="lab-field" data-lab-field="what_changed" data-var-idx="' + v.idx + '"'
       + ' placeholder="ej: hook visual — reloj en muñeca en vez de reloj sobre superficie" rows="2"' + disAttr + ">"
       + (v.what_changed||"") + "</textarea>"
+      + '<div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.05)">'
+      + '<div style="font-size:.63rem;color:#555588;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Métricas de Instagram Insights</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'
+      + _mkMetric("Tiempo prom. (s)", "avg_watch_time", v, disAttr)
+      + _mkMetric("% omisiones", "skip_rate", v, disAttr)
+      + _mkMetric("Nuevos seguidores", "new_followers", v, disAttr)
+      + '</div>'
+      + ((v.read_at) ? '<div style="font-size:.61rem;color:#444466;margin-top:5px">Leído: ' + v.read_at.slice(0,16).replace("T"," ") + '</div>' : '')
+      + '</div>'
       + "</div>";
   }).join("");
 
@@ -668,84 +752,186 @@ def build_html(perfil, insights, posts, demo, history):
     lab_reach_str   = json.dumps(lab_reach_map, ensure_ascii=False)
     lab_js = _LAB_JS.replace("__EXPS__", experiments_str).replace("__REACH__", lab_reach_str)
 
-    # ── Sección: Conclusiones probadas ───────────────────────
-    # ── Playbook: reglas cortas de experimentos cerrados válidos ──
-    PLAYBOOK_RULES = []
-    for exp_id, exp in experiments.items():
-        if not isinstance(exp, dict) or exp.get("status") != "cerrado":
-            continue
-        insight = exp.get("insight", "").strip()
-        if not insight or insight.startswith("⚠️"):
-            continue
-        # Extraer reglas del insight (frases separadas por —)
-        PLAYBOOK_RULES.append({
-            "title": exp.get("name", exp_id),
-            "rules": insight,
-            "source": exp_id.replace("_", " ").upper(),
-        })
+    # ── Hipótesis ─────────────────────────────────────────────
+    HYPOTHESES = [
+        {
+            "id": "h1", "category": "hook",
+            "title": "El texto en pantalla es el principal scroll-stopper",
+            "description": "Una frase provocativa visible en pantalla detiene el scroll antes de que el usuario procese el audio. Sin ella, el mismo hook hablado puede caer 39x en reach. La gente lee antes de escuchar.",
+            "implication": "Siempre incluir texto grande provocativo en pantalla. No importa qué tan bueno sea el hook narrado: sin texto visible el algoritmo no lo distribuye.",
+            "metric": "Reach (distribución algorítmica)",
+            "caveat": "Confirmado en exp_001 (A vs D, 39x diferencia). D fue el primero en subirse y aun así perdió, lo que hace menos probable que sea penalización por orden. Pero A y D tenían pequeñas diferencias de guión — necesita replicación con control más limpio.",
+            "experiments": ["exp_001"],
+        },
+        {
+            "id": "h2", "category": "hook",
+            "title": "El hook de identidad social supera al de autoridad o problema",
+            "description": "En exp_001, 'cómo identificar a alguien con clase por su reloj' (identidad aspiracional) superó a 'lo que los expertos notan en 5 segundos' (autoridad) y 'bajarte del bus con un rolex' (vergüenza específica). El frame de identidad activa curiosidad defensiva + deseo de aprender algo sobre uno mismo.",
+            "implication": "Enmarcar los hooks de atracción desde la identidad y el estatus social, no desde el miedo al error ni la autoridad de expertos.",
+            "metric": "Reach",
+            "caveat": "Un solo experimento con un tema muy específico ('te hacen ver pobre'). El tema puede haber tenido un efecto propio independiente del frame. Necesita replicación con otro tema.",
+            "experiments": ["exp_001"],
+        },
+        {
+            "id": "h3", "category": "presencia",
+            "title": "Daniel en cámara vs solo B-roll afecta watch time y retención",
+            "description": "La presencia humana crea conexión parasocial y puede aumentar el tiempo que alguien pasa viendo el video. Pero B-roll puro da más control visual y puede ser más estético. Para @serratrelojes no tenemos datos propios de cuál retiene más.",
+            "implication": "Si B-roll solo gana: Daniel puede producir más contenido con menos esfuerzo de grabación personal. Si Daniel en cámara gana: vale la pena el esfuerzo de grabar siempre con cara.",
+            "metric": "Tiempo promedio de reproducción + % omisiones",
+            "caveat": "Sin datos. Primera hipótesis sin ningún experimento ejecutado.",
+            "experiments": [],
+        },
+        {
+            "id": "h4", "category": "edicion",
+            "title": "Edición rápida (muchos cortes) genera mayor retención que una sola toma",
+            "description": "Videos con cortes cada 2-3 segundos mantienen atención activa porque el cerebro percibe novedad constante. Una sola toma larga requiere que el contenido mismo sostenga la atención. Para relojes, cuál estilo funciona mejor es desconocido.",
+            "implication": "Define cuánto tiempo vale la pena invertir en edición. Si una toma limpia funciona igual, el costo de producción baja significativamente.",
+            "metric": "% omisiones + tiempo promedio de reproducción",
+            "caveat": "Sin datos.",
+            "experiments": [],
+        },
+        {
+            "id": "h5", "category": "edicion",
+            "title": "Reels cortos (<20s) tienen mayor completion rate que largos (>40s)",
+            "description": "Instagram pesa fuertemente el completion rate. Un reel de 15s con 80% de completion supera a uno de 45s con 30% de completion según la lógica del algoritmo. Pero reels más largos pueden generar más watch time absoluto si el contenido lo sostiene.",
+            "implication": "Define la duración estándar de todos los reels futuros de @serratrelojes.",
+            "metric": "% omisiones + reach",
+            "caveat": "Sin datos propios. La duración óptima puede variar por tipo de contenido (atracción vs conexión).",
+            "experiments": [],
+        },
+        {
+            "id": "h6", "category": "tono",
+            "title": "El humor genera más shares que el contenido aspiracional",
+            "description": "El algoritmo de Reels pesa los shares como señal de distribución a no-seguidores. El humor motiva a compartir ('te mando esto porque me acordé de ti') mientras que lo aspiracional motiva a guardar. Para atracción, los shares llevan el contenido a audiencia nueva.",
+            "implication": "Si se confirma: incluir más humor en reels de atracción para maximizar distribución orgánica.",
+            "metric": "Shares + nuevos seguidores por post",
+            "caveat": "Sin datos. El humor de relojes puede ser difícil de ejecutar sin perder autoridad de marca.",
+            "experiments": [],
+        },
+    ]
 
-    playbook_html = ""
-    for r in PLAYBOOK_RULES:
-        # Partir el insight en frases cortas en puntos separados por "."
-        sentences = [s.strip() for s in r["rules"].replace("✅", "").split(".") if s.strip() and len(s.strip()) > 10]
-        items_html = "".join(
-            f'<li style="margin-bottom:6px;color:#cccce0;font-size:.8rem;line-height:1.5">{s}.</li>'
-            for s in sentences
+    CAT_LABEL = {"hook": "Hook", "presencia": "Presencia", "edicion": "Edición", "tono": "Tono"}
+    CAT_COLOR = {"hook": "#7c6fff", "presencia": "#00bcd4", "edicion": "#fb8c00", "tono": "#00ffa5"}
+
+    for h in HYPOTHESES:
+        confirmed = sum(
+            1 for eid in h["experiments"]
+            if (isinstance(experiments.get(eid), dict)
+                and experiments[eid].get("status") == "cerrado"
+                and experiments[eid].get("insight", "")
+                and not experiments[eid].get("insight", "").startswith("⚠️"))
         )
-        playbook_html += (
-            f'<div style="background:rgba(0,255,165,.05);border-left:3px solid #00ffa5;border-radius:8px;'
-            f'padding:14px 16px;margin-bottom:12px">'
+        h["confidence"] = min(100, confirmed * 20)
+        h["confirmed"]  = confirmed
+
+    hyp_cards_html = ""
+    for h in HYPOTHESES:
+        conf  = h["confidence"]
+        color = CAT_COLOR.get(h["category"], "#8888aa")
+        cat   = CAT_LABEL.get(h["category"], h["category"])
+        bar_c = "#00ffa5" if conf >= 60 else ("#fb8c00" if conf >= 20 else "#5c6bc0")
+        hyp_cards_html += (
+            f'<div class="hyp-card" onclick="openHypModal(\'{h["id"]}\')">'
+            f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+            f'<span style="font-size:.63rem;background:{color}22;color:{color};border-radius:4px;padding:2px 8px;font-weight:600">{cat}</span>'
+            f'<span style="font-size:.68rem;color:#555588">{h["confirmed"]}/5</span>'
+            f'</div>'
+            f'<p style="margin:0 0 12px;font-size:.8rem;color:#ddddf0;line-height:1.45">{h["title"]}</p>'
+            f'<div style="background:#1a1a2e;border-radius:4px;height:4px;overflow:hidden;margin-bottom:5px">'
+            f'<div style="width:{conf}%;height:100%;background:{bar_c};border-radius:4px"></div>'
+            f'</div>'
+            f'<div style="display:flex;justify-content:space-between">'
+            f'<span style="font-size:.63rem;color:#555588">certeza</span>'
+            f'<span style="font-size:.63rem;color:{bar_c};font-weight:700">{conf}%</span>'
+            f'</div>'
+            f'</div>'
+        )
+
+    hyp_json = json.dumps(HYPOTHESES, ensure_ascii=False)
+    lab_js = lab_js.replace("__HYPS__", hyp_json)
+
+    # ── Diseño de experimentos ────────────────────────────────
+    EXPERIMENT_DESIGNS = [
+        {
+            "id": "ed_001", "hypothesis_id": "h1",
+            "name": "Replicación del texto en pantalla",
+            "what_to_prove": "Confirmar que el texto grande en pantalla aumenta reach con un tema diferente a exp_001, aislando esa variable con un control más limpio.",
+            "variable": "Texto en pantalla (3 niveles: provocativo / descriptivo / sin texto)",
+            "controls": "Mismo guión narrado en los 3 videos. Misma música. Misma duración (~20-25s). Mismo caption. B-roll de apertura diferente entre variantes (clips distintos del mismo tema).",
+            "variants": [
+                {"label": "A", "inst": "Guión narrado + TEXTO GRANDE PROVOCATIVO en pantalla desde el segundo 1. La frase debe generar curiosidad o juicio social (ej: algo que haga pensar 'eso soy yo' o 'eso no lo sabía')."},
+                {"label": "B", "inst": "Mismo guión narrado + texto DESCRIPTIVO/NEUTRO en pantalla (ej: nombre del producto o una frase informativa sin carga emocional)."},
+                {"label": "C", "inst": "Mismo guión narrado + SIN ningún texto en pantalla. Solo B-roll y voz."},
+            ],
+            "alerta": "Los 3 videos deben tener B-roll de apertura genuinamente diferente (clips distintos) para evitar penalización por duplicado en Trial Reels.",
+        },
+        {
+            "id": "ed_002", "hypothesis_id": "h2",
+            "name": "Frame del hook — identidad vs problema vs curiosidad",
+            "what_to_prove": "Confirmar que el hook de identidad social supera a otros frames con un tema diferente a exp_001.",
+            "variable": "Frame psicológico del hook hablado (primeros 3 segundos)",
+            "controls": "Mismo texto en pantalla grande en los 3 (usando el aprendizaje de h1). Misma música. Misma duración. B-roll de apertura diferente entre variantes.",
+            "variants": [
+                {"label": "A", "inst": "IDENTIDAD: hook que lleva al espectador a identificarse con un grupo aspiracional. Ej: 'así es como alguien que sabe de relojes piensa diferente' o 'esto es lo que separa a alguien con clase de alguien normal al elegir un reloj'."},
+                {"label": "B", "inst": "PROBLEMA: hook que señala un error o una pérdida. Ej: 'el error más común que comete la gente al comprar un reloj' o 'por qué el 90% de los relojes que ves en Bogotá son una mala decisión'."},
+                {"label": "C", "inst": "CURIOSIDAD/DATO: hook que promete información sorprendente. Ej: 'lo que nadie te dice sobre los relojes baratos' o 'el dato que cambia cómo ves cualquier reloj desde hoy'."},
+            ],
+            "alerta": "Clips de apertura distintos entre variantes. Mismo texto en pantalla en los 3 para que esa variable no afecte el resultado.",
+        },
+        {
+            "id": "ed_003", "hypothesis_id": "h3",
+            "name": "Presencia de Daniel vs solo B-roll del producto",
+            "what_to_prove": "Determinar si la presencia de Daniel en cámara aumenta watch time vs solo B-roll del reloj.",
+            "variable": "Quién/qué aparece en pantalla",
+            "controls": "Guión EXACTAMENTE igual en los 3 videos. Mismo texto en pantalla. Misma música. Misma duración. Mismo tema.",
+            "variants": [
+                {"label": "A", "inst": "DANIEL A CÁMARA: Daniel habla directamente a cámara durante todo el video. Primer plano de cara y cuerpo. Guión completo hablado."},
+                {"label": "B", "inst": "VOZ EN OFF + B-ROLL: B-roll del reloj/producto mientras Daniel narra el mismo guión en off. Daniel no aparece en pantalla."},
+                {"label": "C", "inst": "SOLO TEXTO + B-ROLL: B-roll del reloj, mismo guión pero mostrado como texto en pantalla. Sin voz de Daniel. Solo música de fondo."},
+            ],
+            "alerta": "El guión debe ser EXACTAMENTE el mismo texto en las 3 versiones. Es la única forma de aislar la variable visual.",
+        },
+    ]
+
+    active_design = None
+    if isinstance(experiments.get("_active"), dict):
+        active_design = experiments["_active"].get("design")
+
+    exp_designs_html = ""
+    for d in EXPERIMENT_DESIGNS:
+        is_active = d["id"] == active_design
+        h_ref   = next((h for h in HYPOTHESES if h["id"] == d["hypothesis_id"]), None)
+        h_title = h_ref["title"] if h_ref else ""
+        h_color = CAT_COLOR.get(h_ref["category"], "#8888aa") if h_ref else "#8888aa"
+
+        vars_html = "".join(
+            f'<div style="display:flex;gap:10px;margin-bottom:8px;align-items:flex-start">'
+            f'<span style="font-size:.72rem;font-weight:700;color:#7c6fff;min-width:22px;padding-top:1px">Var {v["label"]}:</span>'
+            f'<p style="margin:0;font-size:.76rem;color:#cccce0;line-height:1.45">{v["inst"]}</p>'
+            f'</div>'
+            for v in d["variants"]
+        )
+        active_badge = '<span style="background:#00ffa522;color:#00ffa5;border-radius:4px;padding:2px 9px;font-size:.63rem;font-weight:700">● ACTIVO</span>' if is_active else ""
+        activate_btn = (
+            "" if is_active else
+            f'<button data-did="{d["id"]}" onclick="activateDesign(this.dataset.did)" '
+            f'style="font-size:.72rem;background:rgba(124,111,255,.12);color:#7c6fff;border:1px solid #7c6fff40;'
+            f'border-radius:6px;padding:5px 14px;cursor:pointer">Activar</button>'
+        )
+        border = "rgba(0,255,165,.25)" if is_active else "rgba(255,255,255,.06)"
+        exp_designs_html += (
+            f'<div style="background:rgba(255,255,255,.02);border:1px solid {border};border-radius:10px;padding:16px;margin-bottom:12px">'
             f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
-            f'<strong style="font-size:.82rem;color:#eeeeff">{r["title"]}</strong>'
-            f'<span style="font-size:.65rem;background:#00ffa522;color:#00ffa5;border-radius:4px;padding:2px 7px">{r["source"]}</span>'
+            f'<strong style="font-size:.84rem;color:#eeeeff">{d["name"]}</strong>{active_badge}'
             f'</div>'
-            f'<ul style="margin:0;padding-left:16px">{items_html}</ul>'
+            f'<p style="font-size:.71rem;color:{h_color};margin:0 0 10px">Testa → {h_title}</p>'
+            f'<p style="font-size:.76rem;color:#aaaacc;margin:0 0 6px"><strong style="color:#cccce0">Variable:</strong> {d["variable"]}</p>'
+            f'<p style="font-size:.76rem;color:#aaaacc;margin:0 0 12px"><strong style="color:#cccce0">Controles fijos:</strong> {d["controls"]}</p>'
+            f'<div style="margin-bottom:12px">{vars_html}</div>'
+            f'<div style="background:rgba(251,140,0,.07);border-left:3px solid #fb8c00;border-radius:4px;padding:8px 12px;font-size:.74rem;color:#ffbb55;margin-bottom:12px">⚠️ {d["alerta"]}</div>'
+            f'<div style="text-align:right">{activate_btn}</div>'
             f'</div>'
         )
-    if not playbook_html:
-        playbook_html = '<p style="color:#555588;font-size:.82rem">Aún no hay experimentos cerrados con resultados válidos.</p>'
-
-    # ── Árbol de decisión ────────────────────────────────────
-    decision_tree_html = """
-<div style="font-size:.8rem;line-height:1.6">
-  <p style="color:#8888aa;margin:0 0 14px">Antes de grabar variantes, responde estas preguntas:</p>
-
-  <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:14px 16px;margin-bottom:8px">
-    <strong style="color:#eeeeff">¿Los fotogramas del video son idénticos entre variantes?</strong>
-    <div style="margin-top:10px;padding-left:14px;border-left:2px solid #333355">
-      <div style="margin-bottom:8px">
-        <span style="color:#ff5555">→ Sí</span>
-        <span style="color:#8888aa"> (mismo clip, diferente texto/audio/música)</span><br>
-        <span style="background:rgba(255,85,85,.1);color:#ff8888;border-radius:6px;padding:4px 10px;display:inline-block;margin-top:4px;font-size:.75rem">
-          ❌ No uses Trial Reels — Instagram detecta el duplicado y suprime todas las variantes excepto la primera. No aprenderás nada del hook.
-        </span>
-      </div>
-      <div>
-        <span style="color:#00ffa5">→ No</span>
-        <span style="color:#8888aa"> (videos genuinamente distintos)</span><br>
-        <div style="margin-top:8px;padding-left:14px;border-left:2px solid #333355">
-          <strong style="color:#eeeeff">¿El hook cambia desde el segundo 1 en los fotogramas?</strong>
-          <div style="margin-top:8px;padding-left:14px;border-left:2px solid #333355">
-            <div style="margin-bottom:8px">
-              <span style="color:#00ffa5">→ Sí</span>
-              <span style="color:#8888aa"> (cara en cámara con guión diferente, o B-roll de apertura distinto)</span><br>
-              <span style="background:rgba(0,255,165,.08);color:#00ffa5;border-radius:6px;padding:4px 10px;display:inline-block;margin-top:4px;font-size:.75rem">
-                ✅ Puedes subirlos en ráfaga como Trial Reels — el fingerprint los trata como contenido distinto.
-              </span>
-            </div>
-            <div>
-              <span style="color:#fb8c00">→ No del todo</span>
-              <span style="color:#8888aa"> (mismo B-roll, diferente orden de clips o cortes sutiles)</span><br>
-              <span style="background:rgba(251,140,0,.08);color:#ffbb55;border-radius:6px;padding:4px 10px;display:inline-block;margin-top:4px;font-size:.75rem">
-                ⚠️ Zona de riesgo — el fingerprint puede o no detectarlo. Si el experimento importa, espera 24h entre variantes o usa B-roll diferente de apertura.
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>"""
 
     # Número de snapshots
     num_snapshots = len(history)
@@ -914,6 +1100,8 @@ def build_html(perfil, insights, posts, demo, history):
   .tab-btn.active{{color:#fff;border-bottom-color:#5c6bc0;font-weight:600}}
   .tab-btn:hover{{color:#cccce0}}
   /* Lab */
+  .hyp-card{{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:14px;cursor:pointer;transition:border-color .2s,background .2s}}
+  .hyp-card:hover{{background:rgba(124,111,255,.08);border-color:rgba(124,111,255,.3)}}
   .lab-card{{margin-bottom:20px}}
   .lab-card-header{{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}}
   .lab-card-id{{font-size:.7rem;color:#555588}}
@@ -1145,37 +1333,43 @@ def build_html(perfil, insights, posts, demo, history):
 
   </div><!-- end dashContent -->
 
+  <!-- Modal hipótesis -->
+  <div id="hypModal" onclick="if(event.target===this)closeHypModal()"
+    style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:center;justify-content:center;padding:20px">
+    <div id="hypModalContent"
+      style="background:#13132a;border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:24px;max-width:520px;width:100%;max-height:85vh;overflow-y:auto">
+    </div>
+  </div>
+
   <!-- LAB TAB -->
   <div id="labContent" style="display:none">
     <div style="margin:0 0 24px">
       <h2 style="margin:0 0 6px;font-size:1.05rem;color:#fff;text-transform:none;letter-spacing:0">🧪 Laboratorio de experimentos</h2>
-      <p style="font-size:.78rem;color:#8888aa;margin:0">Documenta qué cambió en cada variante · los datos los muestra el sistema · <strong style="color:#cccce0">juntos llegamos al insight</strong></p>
+      <p style="font-size:.78rem;color:#8888aa;margin:0">Diseño científico de contenido · hipótesis → experimento → datos → insight repetible</p>
     </div>
 
-    <!-- Playbook colapsible -->
-    <details style="margin-bottom:12px;background:rgba(0,255,165,.03);border:1px solid rgba(0,255,165,.12);border-radius:10px;padding:0">
-      <summary style="cursor:pointer;padding:14px 16px;font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#00ffa5;list-style:none;display:flex;justify-content:space-between;align-items:center">
-        📖 Playbook — lo que ya funciona
-        <span style="font-size:.7rem;color:#00ffa588;font-weight:400;text-transform:none;letter-spacing:0">▾ expandir</span>
+    <!-- Hipótesis -->
+    <div style="margin-bottom:28px">
+      <h3 style="font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:#7c6fff;margin:0 0 14px;font-weight:700">🔬 Hipótesis — toca una para ver detalle</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">
+        {hyp_cards_html}
+      </div>
+    </div>
+
+    <!-- Diseño de experimentos colapsible -->
+    <details style="margin-bottom:28px;background:rgba(124,111,255,.03);border:1px solid rgba(124,111,255,.12);border-radius:10px">
+      <summary style="cursor:pointer;padding:14px 16px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#7c6fff;list-style:none;display:flex;justify-content:space-between;align-items:center">
+        🎯 Diseño de experimentos propuestos
+        <span style="font-size:.7rem;color:#7c6fff66;font-weight:400;text-transform:none;letter-spacing:0">▾ expandir</span>
       </summary>
       <div style="padding:4px 16px 16px">
-        {playbook_html}
+        <p style="font-size:.76rem;color:#555588;margin:0 0 14px">Activa el experimento que vas a ejecutar. Las instrucciones te dicen exactamente qué grabar.</p>
+        {exp_designs_html}
       </div>
     </details>
 
-    <!-- Árbol de decisión colapsible -->
-    <details style="margin-bottom:24px;background:rgba(124,111,255,.03);border:1px solid rgba(124,111,255,.15);border-radius:10px;padding:0">
-      <summary style="cursor:pointer;padding:14px 16px;font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#7c6fff;list-style:none;display:flex;justify-content:space-between;align-items:center">
-        🔀 ¿Puedo hacer este experimento con Trial Reels?
-        <span style="font-size:.7rem;color:#7c6fff88;font-weight:400;text-transform:none;letter-spacing:0">▾ expandir</span>
-      </summary>
-      <div style="padding:4px 16px 16px">
-        {decision_tree_html}
-      </div>
-    </details>
-
-    <!-- Experimentos -->
-    <h3 style="font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:#8888aa;margin:0 0 14px;font-weight:700">🧪 Experimentos</h3>
+    <!-- Experimentos registrados -->
+    <h3 style="font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:#8888aa;margin:0 0 14px;font-weight:700">🧪 Experimentos registrados</h3>
     <div id="labExperiments">
       <p style="color:#555588;font-size:.82rem">Cargando…</p>
     </div>
