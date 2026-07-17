@@ -668,6 +668,70 @@ def build_html(perfil, insights, posts, demo, history):
     lab_reach_str   = json.dumps(lab_reach_map, ensure_ascii=False)
     lab_js = _LAB_JS.replace("__EXPS__", experiments_str).replace("__REACH__", lab_reach_str)
 
+    # ── Sección: Conclusiones probadas ───────────────────────
+    conclusiones_html = ""
+    for exp_id, exp in experiments.items():
+        if isinstance(exp, dict) and exp.get("status") == "cerrado" and exp.get("insight", "").strip():
+            insight = exp["insight"]
+            is_warn = insight.startswith("⚠️")
+            bg   = "rgba(251,140,0,.08)" if is_warn else "rgba(0,255,165,.06)"
+            bdr  = "#fb8c00" if is_warn else "#00ffa5"
+            icon = "⚠️" if is_warn else "✅"
+            conclusiones_html += (
+                f'<div style="background:{bg};border-left:3px solid {bdr};border-radius:8px;'
+                f'padding:14px 16px;margin-bottom:12px">'
+                f'<div style="font-size:.7rem;color:#8888aa;margin-bottom:4px">{icon} {exp.get("name","")}</div>'
+                f'<p style="margin:0;font-size:.82rem;color:#cccce0;line-height:1.55">{insight}</p>'
+                f'</div>'
+            )
+    if not conclusiones_html:
+        conclusiones_html = '<p style="color:#555588;font-size:.82rem">Aún no hay experimentos cerrados.</p>'
+
+    # ── Sección: Experimentos por hacer ──────────────────────
+    PENDING_EXPERIMENTS = [
+        {
+            "name": "Cara vs sin cara — mismo concepto",
+            "why": "En exp_001 el hook ganador fue hablado a cámara. ¿Es Daniel en pantalla el factor, o solo el guión? Hacer el mismo reel con y sin cara para separar las variables.",
+            "tag": "hooks",
+        },
+        {
+            "name": "Hook de identidad vs hook de problema",
+            "why": "En exp_001 \"identificar a alguien con clase\" (identidad) superó a \"lo que los expertos notan\" (autoridad). Testear directamente: identidad aspiracional vs problema/miedo — cuál activa más curiosidad en audiencia nueva.",
+            "tag": "hooks",
+        },
+        {
+            "name": "Texto provocativo en carrusel",
+            "why": "El texto grande en pantalla fue clave en exp_001 para reels. ¿Funciona el mismo principio en carruseles? Primera slide con frase provocativa grande vs headline más suave — medir saves y alcance.",
+            "tag": "formato",
+        },
+        {
+            "name": "Reel corto (15s) vs largo (45s) — mismo hook",
+            "why": "No tenemos datos propios sobre duración óptima. Mismo concepto y hook, dos cortes distintos. Si el corto gana, optimizar todos los reels futuros; si el largo gana, la retención pesa más que la rapidez.",
+            "tag": "formato",
+        },
+        {
+            "name": "CTA de seguimiento al final vs sin CTA",
+            "why": "Probar si agregar \"sígueme para ver más\" al final de un reel de atracción aumenta followers ganados sin castigar reach — o si el algoritmo lo penaliza como contenido de baja calidad.",
+            "tag": "conversión",
+        },
+    ]
+    TAG_COLOR = {"hooks": "#7c6fff", "formato": "#00bcd4", "conversión": "#00ffa5"}
+    pendientes_html = ""
+    for p in PENDING_EXPERIMENTS:
+        color = TAG_COLOR.get(p["tag"], "#8888aa")
+        pendientes_html += (
+            f'<div style="background:rgba(255,255,255,.04);border-radius:8px;padding:14px 16px;margin-bottom:10px;'
+            f'display:flex;gap:12px;align-items:flex-start">'
+            f'<span style="font-size:1.1rem;margin-top:1px">🔬</span>'
+            f'<div style="flex:1">'
+            f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">'
+            f'<strong style="font-size:.85rem;color:#eeeeff">{p["name"]}</strong>'
+            f'<span style="font-size:.65rem;background:{color}22;color:{color};border-radius:4px;padding:2px 7px">{p["tag"]}</span>'
+            f'</div>'
+            f'<p style="margin:0;font-size:.78rem;color:#8888aa;line-height:1.5">{p["why"]}</p>'
+            f'</div></div>'
+        )
+
     # Número de snapshots
     num_snapshots = len(history)
     first_snapshot = min(history.keys()) if history else "—"
@@ -1068,12 +1132,29 @@ def build_html(perfil, insights, posts, demo, history):
 
   <!-- LAB TAB -->
   <div id="labContent" style="display:none">
-    <div style="margin:0 0 24px">
+    <div style="margin:0 0 28px">
       <h2 style="margin:0 0 6px;font-size:1.05rem;color:#fff;text-transform:none;letter-spacing:0">🧪 Laboratorio de experimentos</h2>
       <p style="font-size:.78rem;color:#8888aa;margin:0">Documenta qué cambió en cada variante · los datos los muestra el sistema · <strong style="color:#cccce0">juntos llegamos al insight</strong></p>
     </div>
-    <div id="labExperiments">
-      <p style="color:#555588;font-size:.82rem">Cargando…</p>
+
+    <!-- Conclusiones probadas -->
+    <div style="margin-bottom:32px">
+      <h3 style="font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:#7c6fff;margin:0 0 14px;font-weight:700">📌 Lo que ya sabemos — conclusiones probadas</h3>
+      {conclusiones_html}
+    </div>
+
+    <!-- Experimentos por hacer -->
+    <div style="margin-bottom:32px">
+      <h3 style="font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:#fb8c00;margin:0 0 14px;font-weight:700">🎯 Lo que debemos probar</h3>
+      {pendientes_html}
+    </div>
+
+    <!-- Experimentos activos -->
+    <div>
+      <h3 style="font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:#8888aa;margin:0 0 14px;font-weight:700">🧪 Experimentos</h3>
+      <div id="labExperiments">
+        <p style="color:#555588;font-size:.82rem">Cargando…</p>
+      </div>
     </div>
   </div>
 
