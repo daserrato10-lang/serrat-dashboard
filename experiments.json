@@ -3,7 +3,7 @@
     "name": "Estos relojes te hacen ver pobre",
     "variable_tested": "Hook hablado y hook visual.",
     "content_type": "atracción",
-    "status": "pendiente",
+    "status": "cerrado",
     "created_at": "2026-07-16",
     "variants": [
       {
@@ -31,15 +31,15 @@
         "permalink": "https://www.instagram.com/reel/DYnnnxOpXL1/"
       }
     ],
-    "winner_id": null,
-    "insight": "Funciona tener una frase grande que la gente lea y sea provocativa",
-    "decided_at": null
+    "winner_id": "18104376200058995",
+    "insight": "El texto grande en pantalla hace todo el trabajo de scroll-stop — sin él, el mismo hook hablado cae 39x (A: 5.810 vs D: 148). El hook ganador es el de identidad social (\"identificar a alguien con clase\"), no el de autoridad (\"expertos\") ni el de vergüenza específica (\"rolex en el bus\"). La combinación ganadora: frase provocativa en pantalla + hook aspiracional hablado. ✅ Experimento válido — cada variante tenía guión diferente, Instagram las trató como contenido distinto.",
+    "decided_at": "2026-07-16"
   },
   "exp_002": {
     "name": "Una camisa se desgasta",
     "variable_tested": "la idea era el mismo video, con diferente texto en pantalla",
     "content_type": "atracción",
-    "status": "pendiente",
+    "status": "cerrado",
     "created_at": "2026-07-16",
     "variants": [
       {
@@ -80,7 +80,7 @@
       }
     ],
     "winner_id": null,
-    "insight": "básicamente que no se puede usar el mismo video y solo cambiar el texto porque se penaliza",
-    "decided_at": null
+    "insight": "⚠️ Experimento no válido — mismo video base en las 6 variantes activa penalización de Instagram por contenido duplicado. Solo A (el primero en subirse) recibió distribución normal (2.888 reach); los 5 siguientes fueron suprimidos (22–130 reach). No se puede testear solo texto en pantalla o música con Trial Reels si el video base es idéntico. Para testear variantes visuales/texto, publicar al feed con tiempo entre versiones, no como Trial Reels en ráfaga.",
+    "decided_at": "2026-07-16"
   }
 }
