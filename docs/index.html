@@ -132,13 +132,20 @@
   .lab-close-btn{background:#1e1e38;border:1px solid #3a3a5c;color:#cccce0;
                   padding:6px 16px;border-radius:20px;cursor:pointer;font-size:.75rem}
   .lab-close-btn:hover{border-color:#5c6bc0;color:#fff}
+  /* Inputs inline de métricas en la tabla */
+  .inline-insight-input{width:58px;background:#13132a;border:1px solid #2a2a44;border-radius:6px;
+    padding:3px 5px;color:#cccce0;font-size:.72rem;text-align:center;outline:none;
+    transition:border-color .15s;-moz-appearance:textfield}
+  .inline-insight-input::-webkit-inner-spin-button,.inline-insight-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+  .inline-insight-input:focus{border-color:#7c6fff;background:#1a1a2e}
+  .inline-insight-input:not(:placeholder-shown){color:#00ffa5;border-color:#00ffa530}
 </style>
 </head>
 <body>
 
 <div class="top-bar">
   <h1>⌚ Serrat Relojes — Dashboard Instagram</h1>
-  <span class="updated">Actualizado: 16 Jul 2026, 11:12 PM</span>
+  <span class="updated">Actualizado: 16 Jul 2026, 11:17 PM</span>
 </div>
 
 <div class="content">
@@ -156,7 +163,7 @@
   <div class="kpi-grid">
     <div class="kpi green">
       <div class="label">Seguidores</div>
-      <div class="value">17,876</div>
+      <div class="value">17,878</div>
       <div class="sub">total actual</div>
     </div>
   </div>
@@ -171,19 +178,19 @@
     </div>
   </div>
   <div class="kpi-grid" id="kpiPeriod">
-    <div class="kpi blue"><div class="label">Alcance</div><div class="value kpi-val" data-key="reach">148,840</div></div>
-    <div class="kpi purple"><div class="label">Visitas de perfil</div><div class="value kpi-val" data-key="profile_views">10,182</div></div>
-    <div class="kpi orange"><div class="label">Clics al sitio web</div><div class="value kpi-val" data-key="website_clicks">2,310</div></div>
+    <div class="kpi blue"><div class="label">Alcance</div><div class="value kpi-val" data-key="reach">148,898</div></div>
+    <div class="kpi purple"><div class="label">Visitas de perfil</div><div class="value kpi-val" data-key="profile_views">10,188</div></div>
+    <div class="kpi orange"><div class="label">Clics al sitio web</div><div class="value kpi-val" data-key="website_clicks">2,311</div></div>
     <div class="kpi teal"><div class="label">Seguidores ganados</div><div class="value kpi-val" data-key="follower_count">1,779</div></div>
     <div class="kpi pink"><div class="label">Tasa de engagement</div><div class="value" id="kpiEng">2.58%</div><div class="sub">interacciones / alcance</div></div>
   </div>
 
   <div class="kpi-grid" style="margin-top:14px">
-    <div class="kpi blue"><div class="label">Total interacciones</div><div class="value kpi-val" data-key="total_interactions">3,839</div></div>
-    <div class="kpi pink"><div class="label">Likes</div><div class="value kpi-val" data-key="likes">2,933</div></div>
+    <div class="kpi blue"><div class="label">Total interacciones</div><div class="value kpi-val" data-key="total_interactions">3,842</div></div>
+    <div class="kpi pink"><div class="label">Likes</div><div class="value kpi-val" data-key="likes">2,935</div></div>
     <div class="kpi purple"><div class="label">Comentarios</div><div class="value kpi-val" data-key="comments">136</div></div>
     <div class="kpi teal"><div class="label">Compartidos</div><div class="value kpi-val" data-key="shares">151</div></div>
-    <div class="kpi orange"><div class="label">Guardados</div><div class="value kpi-val" data-key="saves">390</div></div>
+    <div class="kpi orange"><div class="label">Guardados</div><div class="value kpi-val" data-key="saves">391</div></div>
   </div>
 
   <div class="card" style="margin-top:20px">
@@ -302,7 +309,11 @@
           <th class="center" title="Posts fijados en el perfil — excluidos de los insights">📌</th>
           <th class="num">Likes</th><th class="num">Coments</th>
           <th class="num">Alcance</th><th class="num">Guardados</th>
-          <th class="num">Compartidos</th><th class="num">Eng%</th><th>Link</th>
+          <th class="num">Compartidos</th><th class="num">Eng%</th>
+          <th class="center" title="Tiempo promedio de reproducción (segundos) — llenar desde Instagram Insights">⏱ (s)</th>
+          <th class="center" title="Porcentaje de omisiones — llenar desde Instagram Insights">⏭ %</th>
+          <th class="center" title="Nuevos seguidores ganados por este post — llenar desde Instagram Insights">👥+</th>
+          <th>Link</th>
         </tr>
       </thead>
       <tbody>
@@ -311,9 +322,9 @@
           <td class="caption">encontramos algo en el brazo de Lautaro que nadie había notado. 👀  lo intentamos ampliar… no se veía bien…  pero cuando </td>
           <td class="center">🎞️</td>
           <td class="center">
-            <select class="tag-select" data-pid="18169839742442104" style="border-color:#555577;color:#555577"
+            <select class="tag-select" data-pid="18169839742442104" style="border-color:#e91e63;color:#e91e63"
                     onclick="event.stopPropagation()" onchange="saveTag(this)">
-              <option value="atracción" >atracción</option><option value="conexión" >conexión</option><option value="conversión" >conversión</option><option value="sin etiquetar" selected>sin etiquetar</option>
+              <option value="atracción" selected>atracción</option><option value="conexión" >conexión</option><option value="conversión" >conversión</option><option value="sin etiquetar" >sin etiquetar</option>
             </select>
           </td>
           <td class="center">
@@ -322,10 +333,16 @@
           </td>
           <td class="num">25</td>
           <td class="num">2</td>
-          <td class="num">1,737</td>
+          <td class="num">1,770</td>
           <td class="num">1</td>
           <td class="num">0</td>
-          <td class="num">1.6%</td>
+          <td class="num">1.5%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18169839742442104" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18169839742442104" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="18169839742442104" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/p/Da37ax4idtL/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="17941750935270876" onclick="openModal(this.dataset.pid)">
@@ -344,10 +361,16 @@
           </td>
           <td class="num">71</td>
           <td class="num">4</td>
-          <td class="num">2,959</td>
+          <td class="num">2,963</td>
           <td class="num">0</td>
           <td class="num">3</td>
           <td class="num">2.5%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="17941750935270876" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="17941750935270876" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="17941750935270876" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/reel/Da1VAXtJsAm/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="17953067912999849" onclick="openModal(this.dataset.pid)">
@@ -370,6 +393,12 @@
           <td class="num">0</td>
           <td class="num">0</td>
           <td class="num">3.3%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="17953067912999849" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="17953067912999849" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="17953067912999849" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/p/Dayzlt4CU9J/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="17995661264996435" onclick="openModal(this.dataset.pid)">
@@ -392,6 +421,12 @@
           <td class="num">2</td>
           <td class="num">0</td>
           <td class="num">1.7%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="17995661264996435" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="17995661264996435" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="17995661264996435" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/reel/DaoSLblplC1/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="18325967416258545" onclick="openModal(this.dataset.pid)">
@@ -410,10 +445,16 @@
           </td>
           <td class="num">18</td>
           <td class="num">0</td>
-          <td class="num">1,066</td>
+          <td class="num">1,068</td>
           <td class="num">1</td>
           <td class="num">0</td>
           <td class="num">1.7%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18325967416258545" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18325967416258545" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="18325967416258545" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/p/Dal3PAWCRkZ/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="18113383226478701" onclick="openModal(this.dataset.pid)">
@@ -436,6 +477,12 @@
           <td class="num">1</td>
           <td class="num">0</td>
           <td class="num">2.0%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18113383226478701" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18113383226478701" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="18113383226478701" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/p/Daf5JCkDlVQ/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="18152408782495873" onclick="openModal(this.dataset.pid)">
@@ -454,10 +501,16 @@
           </td>
           <td class="num">27</td>
           <td class="num">0</td>
-          <td class="num">1,460</td>
+          <td class="num">1,464</td>
           <td class="num">0</td>
           <td class="num">0</td>
           <td class="num">1.8%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18152408782495873" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18152408782495873" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="18152408782495873" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/p/Daaw3aNDgNW/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="17948406147231277" onclick="openModal(this.dataset.pid)">
@@ -480,6 +533,12 @@
           <td class="num">2</td>
           <td class="num">3</td>
           <td class="num">1.2%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="17948406147231277" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="17948406147231277" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="17948406147231277" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/p/DaVeMbljvXF/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="18096284966259170" onclick="openModal(this.dataset.pid)">
@@ -498,10 +557,16 @@
           </td>
           <td class="num">76</td>
           <td class="num">12</td>
-          <td class="num">2,161</td>
+          <td class="num">2,164</td>
           <td class="num">0</td>
           <td class="num">17</td>
           <td class="num">4.1%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18096284966259170" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18096284966259170" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="18096284966259170" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/reel/DaT2dtPpynY/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="18125507383638720" onclick="openModal(this.dataset.pid)">
@@ -524,6 +589,12 @@
           <td class="num">0</td>
           <td class="num">0</td>
           <td class="num">1.9%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18125507383638720" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18125507383638720" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="18125507383638720" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/p/DaTp0j1CZko/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="18071740646341876" onclick="openModal(this.dataset.pid)">
@@ -546,6 +617,12 @@
           <td class="num">1</td>
           <td class="num">0</td>
           <td class="num">3.0%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18071740646341876" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18071740646341876" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="18071740646341876" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/p/DaRWhN7jg9p/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="17949203343206684" onclick="openModal(this.dataset.pid)">
@@ -564,10 +641,16 @@
           </td>
           <td class="num">34</td>
           <td class="num">2</td>
-          <td class="num">1,601</td>
+          <td class="num">1,604</td>
           <td class="num">0</td>
           <td class="num">2</td>
           <td class="num">2.2%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="17949203343206684" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="17949203343206684" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="17949203343206684" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/p/DaQUfb-Dqe0/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="18000042275952613" onclick="openModal(this.dataset.pid)">
@@ -590,6 +673,12 @@
           <td class="num">2</td>
           <td class="num">2</td>
           <td class="num">1.4%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18000042275952613" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18000042275952613" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="18000042275952613" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/reel/DaB8iL1uItw/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="18086488862121190" onclick="openModal(this.dataset.pid)">
@@ -612,6 +701,12 @@
           <td class="num">0</td>
           <td class="num">6</td>
           <td class="num">1.7%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18086488862121190" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18086488862121190" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="18086488862121190" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/reel/DZ_QVfnMwzH/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="18053707136766288" onclick="openModal(this.dataset.pid)">
@@ -630,10 +725,16 @@
           </td>
           <td class="num">20</td>
           <td class="num">0</td>
-          <td class="num">1,823</td>
+          <td class="num">1,825</td>
           <td class="num">3</td>
           <td class="num">0</td>
           <td class="num">1.1%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18053707136766288" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18053707136766288" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="18053707136766288" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/p/DZ8hbPkiZP_/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="17984302880840584" onclick="openModal(this.dataset.pid)">
@@ -652,10 +753,16 @@
           </td>
           <td class="num">50</td>
           <td class="num">3</td>
-          <td class="num">2,648</td>
+          <td class="num">2,652</td>
           <td class="num">8</td>
           <td class="num">3</td>
           <td class="num">2.0%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="17984302880840584" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="17984302880840584" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="17984302880840584" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/reel/DZ6Fow3Jfzx/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="18085286948454629" onclick="openModal(this.dataset.pid)">
@@ -678,6 +785,12 @@
           <td class="num">2</td>
           <td class="num">0</td>
           <td class="num">1.4%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18085286948454629" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18085286948454629" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="18085286948454629" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/p/DZvxZEkCTch/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="18377075095166493" onclick="openModal(this.dataset.pid)">
@@ -700,6 +813,12 @@
           <td class="num">5</td>
           <td class="num">4</td>
           <td class="num">1.6%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18377075095166493" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18377075095166493" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="18377075095166493" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/p/DZixjKpCU19/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="18039251168799574" onclick="openModal(this.dataset.pid)">
@@ -722,6 +841,12 @@
           <td class="num">1</td>
           <td class="num">0</td>
           <td class="num">0.6%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18039251168799574" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18039251168799574" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="18039251168799574" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/reel/DZgNAacpEK8/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="17977470585032524" onclick="openModal(this.dataset.pid)">
@@ -744,6 +869,12 @@
           <td class="num">7</td>
           <td class="num">2</td>
           <td class="num">1.4%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="17977470585032524" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="17977470585032524" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="17977470585032524" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/reel/DZdyq-ep0zN/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="17902335564284795" onclick="openModal(this.dataset.pid)">
@@ -766,6 +897,12 @@
           <td class="num">26</td>
           <td class="num">14</td>
           <td class="num">3.3%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="17902335564284795" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="17902335564284795" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="17902335564284795" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/p/DZbcd9Djp_C/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="18085757342296435" onclick="openModal(this.dataset.pid)">
@@ -788,6 +925,12 @@
           <td class="num">25</td>
           <td class="num">5</td>
           <td class="num">5.1%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18085757342296435" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18085757342296435" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="18085757342296435" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/reel/DZYkMd5JVUN/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="18128342584610153" onclick="openModal(this.dataset.pid)">
@@ -810,6 +953,12 @@
           <td class="num">2</td>
           <td class="num">1</td>
           <td class="num">2.8%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18128342584610153" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18128342584610153" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="18128342584610153" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/reel/DZVZGDEJdip/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="18589681717043433" onclick="openModal(this.dataset.pid)">
@@ -832,6 +981,12 @@
           <td class="num">6</td>
           <td class="num">1</td>
           <td class="num">1.4%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18589681717043433" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18589681717043433" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="18589681717043433" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/reel/DZQB7wbu86e/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="18164669227448871" onclick="openModal(this.dataset.pid)">
@@ -854,6 +1009,12 @@
           <td class="num">9</td>
           <td class="num">12</td>
           <td class="num">2.9%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18164669227448871" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18164669227448871" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="18164669227448871" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/reel/DZLqXCFJGEU/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="18105194593800083" onclick="openModal(this.dataset.pid)">
@@ -876,6 +1037,12 @@
           <td class="num">3</td>
           <td class="num">2</td>
           <td class="num">2.2%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18105194593800083" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18105194593800083" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="18105194593800083" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/reel/DZJE_QaAvte/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="18095021312245005" onclick="openModal(this.dataset.pid)">
@@ -898,6 +1065,12 @@
           <td class="num">2</td>
           <td class="num">5</td>
           <td class="num">2.2%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18095021312245005" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18095021312245005" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="18095021312245005" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/reel/DZGpyWrpcfM/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="18166047946440553" onclick="openModal(this.dataset.pid)">
@@ -920,6 +1093,12 @@
           <td class="num">23</td>
           <td class="num">18</td>
           <td class="num">3.2%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18166047946440553" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18166047946440553" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="18166047946440553" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/p/DZDgjKdCbUa/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="18094007237265502" onclick="openModal(this.dataset.pid)">
@@ -942,6 +1121,12 @@
           <td class="num">0</td>
           <td class="num">0</td>
           <td class="num">1.8%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18094007237265502" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18094007237265502" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="18094007237265502" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/reel/DY8Gy4FJKvT/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>
         <tr class="clickable" data-pid="18105426454782065" onclick="openModal(this.dataset.pid)">
@@ -964,6 +1149,12 @@
           <td class="num">2</td>
           <td class="num">2</td>
           <td class="num">0.7%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18105426454782065" data-field="avg_watch_time"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="18105426454782065" data-field="skip_rate"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="18105426454782065" data-field="new_followers"
+               value="" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="https://www.instagram.com/reel/DY5nG91JKWy/" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr></tbody>
     </table>
@@ -1096,7 +1287,7 @@
 
 <script>
 // ── Filtro de ventana temporal ───────────────────────────────
-const INSIGHTS = {"7": {"reach": 40384, "reach_daily": [{"date": "2026-07-10", "value": 4957}, {"date": "2026-07-11", "value": 5232}, {"date": "2026-07-12", "value": 6435}, {"date": "2026-07-13", "value": 5599}, {"date": "2026-07-14", "value": 4391}, {"date": "2026-07-15", "value": 6600}, {"date": "2026-07-16", "value": 7170}], "follower_count": 322, "profile_views": 2591, "website_clicks": 568, "total_interactions": 774, "likes": 622, "comments": 31, "shares": 22, "saves": 62}, "14": {"reach": 75519, "reach_daily": [{"date": "2026-07-03", "value": 3618}, {"date": "2026-07-04", "value": 3726}, {"date": "2026-07-05", "value": 4785}, {"date": "2026-07-06", "value": 5759}, {"date": "2026-07-07", "value": 5620}, {"date": "2026-07-08", "value": 6454}, {"date": "2026-07-09", "value": 5173}, {"date": "2026-07-10", "value": 4957}, {"date": "2026-07-11", "value": 5232}, {"date": "2026-07-12", "value": 6435}, {"date": "2026-07-13", "value": 5599}, {"date": "2026-07-14", "value": 4391}, {"date": "2026-07-15", "value": 6600}, {"date": "2026-07-16", "value": 7170}], "follower_count": 749, "profile_views": 5162, "website_clicks": 1153, "total_interactions": 1803, "likes": 1386, "comments": 73, "shares": 58, "saves": 191}, "28": {"reach": 148840, "reach_daily": [{"date": "2026-06-19", "value": 3624}, {"date": "2026-06-20", "value": 4425}, {"date": "2026-06-21", "value": 5928}, {"date": "2026-06-22", "value": 4664}, {"date": "2026-06-23", "value": 4165}, {"date": "2026-06-24", "value": 4227}, {"date": "2026-06-25", "value": 5754}, {"date": "2026-06-26", "value": 5487}, {"date": "2026-06-27", "value": 5490}, {"date": "2026-06-28", "value": 5824}, {"date": "2026-06-29", "value": 6117}, {"date": "2026-06-30", "value": 5685}, {"date": "2026-07-01", "value": 6001}, {"date": "2026-07-02", "value": 5930}, {"date": "2026-07-03", "value": 3618}, {"date": "2026-07-04", "value": 3726}, {"date": "2026-07-05", "value": 4785}, {"date": "2026-07-06", "value": 5759}, {"date": "2026-07-07", "value": 5620}, {"date": "2026-07-08", "value": 6454}, {"date": "2026-07-09", "value": 5173}, {"date": "2026-07-10", "value": 4957}, {"date": "2026-07-11", "value": 5232}, {"date": "2026-07-12", "value": 6435}, {"date": "2026-07-13", "value": 5599}, {"date": "2026-07-14", "value": 4391}, {"date": "2026-07-15", "value": 6600}, {"date": "2026-07-16", "value": 7170}], "follower_count": 1779, "profile_views": 10182, "website_clicks": 2310, "total_interactions": 3839, "likes": 2933, "comments": 136, "shares": 151, "saves": 390}};
+const INSIGHTS = {"7": {"reach": 40442, "reach_daily": [{"date": "2026-07-10", "value": 4957}, {"date": "2026-07-11", "value": 5232}, {"date": "2026-07-12", "value": 6435}, {"date": "2026-07-13", "value": 5599}, {"date": "2026-07-14", "value": 4391}, {"date": "2026-07-15", "value": 6600}, {"date": "2026-07-16", "value": 7228}], "follower_count": 322, "profile_views": 2597, "website_clicks": 569, "total_interactions": 777, "likes": 624, "comments": 31, "shares": 22, "saves": 63}, "14": {"reach": 75577, "reach_daily": [{"date": "2026-07-03", "value": 3618}, {"date": "2026-07-04", "value": 3726}, {"date": "2026-07-05", "value": 4785}, {"date": "2026-07-06", "value": 5759}, {"date": "2026-07-07", "value": 5620}, {"date": "2026-07-08", "value": 6454}, {"date": "2026-07-09", "value": 5173}, {"date": "2026-07-10", "value": 4957}, {"date": "2026-07-11", "value": 5232}, {"date": "2026-07-12", "value": 6435}, {"date": "2026-07-13", "value": 5599}, {"date": "2026-07-14", "value": 4391}, {"date": "2026-07-15", "value": 6600}, {"date": "2026-07-16", "value": 7228}], "follower_count": 749, "profile_views": 5168, "website_clicks": 1154, "total_interactions": 1806, "likes": 1388, "comments": 73, "shares": 58, "saves": 192}, "28": {"reach": 148898, "reach_daily": [{"date": "2026-06-19", "value": 3624}, {"date": "2026-06-20", "value": 4425}, {"date": "2026-06-21", "value": 5928}, {"date": "2026-06-22", "value": 4664}, {"date": "2026-06-23", "value": 4165}, {"date": "2026-06-24", "value": 4227}, {"date": "2026-06-25", "value": 5754}, {"date": "2026-06-26", "value": 5487}, {"date": "2026-06-27", "value": 5490}, {"date": "2026-06-28", "value": 5824}, {"date": "2026-06-29", "value": 6117}, {"date": "2026-06-30", "value": 5685}, {"date": "2026-07-01", "value": 6001}, {"date": "2026-07-02", "value": 5930}, {"date": "2026-07-03", "value": 3618}, {"date": "2026-07-04", "value": 3726}, {"date": "2026-07-05", "value": 4785}, {"date": "2026-07-06", "value": 5759}, {"date": "2026-07-07", "value": 5620}, {"date": "2026-07-08", "value": 6454}, {"date": "2026-07-09", "value": 5173}, {"date": "2026-07-10", "value": 4957}, {"date": "2026-07-11", "value": 5232}, {"date": "2026-07-12", "value": 6435}, {"date": "2026-07-13", "value": 5599}, {"date": "2026-07-14", "value": 4391}, {"date": "2026-07-15", "value": 6600}, {"date": "2026-07-16", "value": 7228}], "follower_count": 1779, "profile_views": 10188, "website_clicks": 2311, "total_interactions": 3842, "likes": 2935, "comments": 136, "shares": 151, "saves": 391}};
 let reachChart = null;
 
 function fmt(n) { return (n||0).toLocaleString("es-CO"); }
@@ -1196,10 +1387,21 @@ async function loadTagsFromServer() {
   mergeLocalTags(ALL_POSTS_VU);
   applyTagsToSelects();
   applyPinBtns();
+  applyInsightsToInputs();
   renderRanking();
   renderInsights();
   renderPriorityQueue();
   if (window.renderClicksChart) window.renderClicksChart(window._clicksMetric || "clicks");
+}
+
+function applyInsightsToInputs() {
+  document.querySelectorAll(".inline-insight-input").forEach(inp => {
+    const pid   = inp.dataset.pid;
+    const field = inp.dataset.field;
+    const ins   = _insights[pid] || {};
+    const val   = ins[field];
+    inp.value = val != null ? val : "";
+  });
 }
 
 function shortCap(caption, len) {
@@ -1386,6 +1588,32 @@ async function saveTags() {
     btn.disabled = false;
     console.error("Error guardando tags:", e);
   }
+}
+
+async function saveInlineInsight(input) {
+  const pid   = input.dataset.pid;
+  const field = input.dataset.field;
+  const raw   = input.value.trim();
+  const val   = raw !== "" ? (field === "new_followers" ? parseInt(raw) : parseFloat(raw)) : null;
+
+  if (!_insights[pid]) _insights[pid] = {};
+  _insights[pid][field]   = val;
+  _insights[pid].read_at  = new Date().toISOString();
+
+  // Feedback visual inmediato
+  input.style.borderColor = "#00ffa5";
+  setTimeout(() => { input.style.borderColor = ""; }, 1200);
+
+  try {
+    await fetch("/save-tags", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ _insights: { [pid]: _insights[pid] } })
+    });
+    renderRanking();
+    renderInsights();
+    renderPriorityQueue();
+  } catch(e) { console.error("saveInlineInsight:", e); }
 }
 
 function applyTagsToSelects() {

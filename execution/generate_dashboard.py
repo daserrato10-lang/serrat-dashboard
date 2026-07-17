@@ -962,6 +962,10 @@ def build_html(perfil, insights, posts, demo, history):
         pin_icon    = "📌" if is_pinned else "📍"
         pin_title   = "Fijado — excluido de insights" if is_pinned else "Marcar como fijado en el perfil"
         pin_cls     = " pin-active" if is_pinned else ""
+        ins         = post_insights.get(pid, {})
+        wt_val      = ins.get("avg_watch_time", "")
+        sr_val      = ins.get("skip_rate", "")
+        nf_val      = ins.get("new_followers", "")
         posts_rows += f"""
         <tr class="clickable" data-pid="{pid}" onclick="openModal(this.dataset.pid)">
           <td>{pub}<br><small style="color:#666">{days_old}d</small></td>
@@ -983,6 +987,12 @@ def build_html(perfil, insights, posts, demo, history):
           <td class="num">{p.get("metric_saved",0):,}</td>
           <td class="num">{p.get("metric_shares",0):,}</td>
           <td class="num">{eng}%</td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="{pid}" data-field="avg_watch_time"
+               value="{wt_val}" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="{pid}" data-field="skip_rate"
+               value="{sr_val}" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="{pid}" data-field="new_followers"
+               value="{nf_val}" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="{p.get("permalink","")}" target="_blank" onclick="event.stopPropagation()">↗</a></td>
         </tr>"""
 
@@ -1136,6 +1146,13 @@ def build_html(perfil, insights, posts, demo, history):
   .lab-close-btn{{background:#1e1e38;border:1px solid #3a3a5c;color:#cccce0;
                   padding:6px 16px;border-radius:20px;cursor:pointer;font-size:.75rem}}
   .lab-close-btn:hover{{border-color:#5c6bc0;color:#fff}}
+  /* Inputs inline de métricas en la tabla */
+  .inline-insight-input{{width:58px;background:#13132a;border:1px solid #2a2a44;border-radius:6px;
+    padding:3px 5px;color:#cccce0;font-size:.72rem;text-align:center;outline:none;
+    transition:border-color .15s;-moz-appearance:textfield}}
+  .inline-insight-input::-webkit-inner-spin-button,.inline-insight-input::-webkit-outer-spin-button{{-webkit-appearance:none;margin:0}}
+  .inline-insight-input:focus{{border-color:#7c6fff;background:#1a1a2e}}
+  .inline-insight-input:not(:placeholder-shown){{color:#00ffa5;border-color:#00ffa530}}
 </style>
 </head>
 <body>
@@ -1306,7 +1323,11 @@ def build_html(perfil, insights, posts, demo, history):
           <th class="center" title="Posts fijados en el perfil — excluidos de los insights">📌</th>
           <th class="num">Likes</th><th class="num">Coments</th>
           <th class="num">Alcance</th><th class="num">Guardados</th>
-          <th class="num">Compartidos</th><th class="num">Eng%</th><th>Link</th>
+          <th class="num">Compartidos</th><th class="num">Eng%</th>
+          <th class="center" title="Tiempo promedio de reproducción (segundos) — llenar desde Instagram Insights">⏱ (s)</th>
+          <th class="center" title="Porcentaje de omisiones — llenar desde Instagram Insights">⏭ %</th>
+          <th class="center" title="Nuevos seguidores ganados por este post — llenar desde Instagram Insights">👥+</th>
+          <th>Link</th>
         </tr>
       </thead>
       <tbody>{posts_rows}</tbody>
@@ -1540,10 +1561,21 @@ async function loadTagsFromServer() {{
   mergeLocalTags(ALL_POSTS_VU);
   applyTagsToSelects();
   applyPinBtns();
+  applyInsightsToInputs();
   renderRanking();
   renderInsights();
   renderPriorityQueue();
   if (window.renderClicksChart) window.renderClicksChart(window._clicksMetric || "clicks");
+}}
+
+function applyInsightsToInputs() {{
+  document.querySelectorAll(".inline-insight-input").forEach(inp => {{
+    const pid   = inp.dataset.pid;
+    const field = inp.dataset.field;
+    const ins   = _insights[pid] || {{}};
+    const val   = ins[field];
+    inp.value = val != null ? val : "";
+  }});
 }}
 
 function shortCap(caption, len) {{
@@ -1730,6 +1762,32 @@ async function saveTags() {{
     btn.disabled = false;
     console.error("Error guardando tags:", e);
   }}
+}}
+
+async function saveInlineInsight(input) {{
+  const pid   = input.dataset.pid;
+  const field = input.dataset.field;
+  const raw   = input.value.trim();
+  const val   = raw !== "" ? (field === "new_followers" ? parseInt(raw) : parseFloat(raw)) : null;
+
+  if (!_insights[pid]) _insights[pid] = {{}};
+  _insights[pid][field]   = val;
+  _insights[pid].read_at  = new Date().toISOString();
+
+  // Feedback visual inmediato
+  input.style.borderColor = "#00ffa5";
+  setTimeout(() => {{ input.style.borderColor = ""; }}, 1200);
+
+  try {{
+    await fetch("/save-tags", {{
+      method: "POST",
+      headers: {{ "Content-Type": "application/json" }},
+      body: JSON.stringify({{ _insights: {{ [pid]: _insights[pid] }} }})
+    }});
+    renderRanking();
+    renderInsights();
+    renderPriorityQueue();
+  }} catch(e) {{ console.error("saveInlineInsight:", e); }}
 }}
 
 function applyTagsToSelects() {{
