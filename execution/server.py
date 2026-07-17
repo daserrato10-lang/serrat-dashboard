@@ -152,8 +152,12 @@ class Handler(BaseHTTPRequestHandler):
                 # _pinned es lista — unir ambas
                 existing_pinned = set(existing.pop("_pinned", []))
                 new_pinned      = set(tags.pop("_pinned", []))
+                # _insights es dict de dicts — deep merge a nivel de post_id
+                existing_insights = existing.pop("_insights", {})
+                new_insights      = tags.pop("_insights", {})
                 merged = {**existing, **tags}
-                merged["_pinned"] = list(existing_pinned | new_pinned)
+                merged["_pinned"]   = list(existing_pinned | new_pinned)
+                merged["_insights"] = {**existing_insights, **new_insights}
                 content = json.dumps(merged, ensure_ascii=False, indent=2)
                 gh_write(GH_TAGS_PATH, content, sha, "tags: actualizar desde dashboard")
                 _cache["ts"] = 0  # Invalidar caché para que el próximo GET regenere

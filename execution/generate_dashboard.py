@@ -686,10 +686,11 @@ def build_html(perfil, insights, posts, demo, history):
     shares   = ins28.get("shares", 0)
     saves    = ins28.get("saves", 0)
 
-    raw_tags  = load_tags()
-    pinned_ids = raw_tags.pop("_pinned", [])
-    tags       = raw_tags
-    pinned_set = set(pinned_ids)
+    raw_tags     = load_tags()
+    pinned_ids   = raw_tags.pop("_pinned", [])
+    post_insights = raw_tags.pop("_insights", {})
+    tags         = raw_tags
+    pinned_set   = set(pinned_ids)
     eng_rate = round(inter / reach * 100, 2) if reach else 0
 
     reach_labels = json.dumps([d["date"] for d in ins28.get("reach_daily", [])])
@@ -733,9 +734,10 @@ def build_html(perfil, insights, posts, demo, history):
     colors_json    = json.dumps(COLORS)
     categories_json = json.dumps(CATEGORIES)
     tag_colors_json = json.dumps(TAG_COLORS)
-    pinned_json          = json.dumps(list(pinned_set))
-    follower_series_json = json.dumps(follower_series, ensure_ascii=False)
-    clicks_series_json   = json.dumps(clicks_series, ensure_ascii=False)
+    pinned_json           = json.dumps(list(pinned_set))
+    post_insights_json    = json.dumps(post_insights, ensure_ascii=False)
+    follower_series_json  = json.dumps(follower_series, ensure_ascii=False)
+    clicks_series_json    = json.dumps(clicks_series, ensure_ascii=False)
 
     # Lab — reach map por post y experimentos
     lab_reach_map = {}
@@ -1203,6 +1205,9 @@ def build_html(perfil, insights, posts, demo, history):
         <button class="btn" data-metric="vida_util">Vida útil</button>
         <button class="btn" data-metric="reach">Alcance total</button>
         <button class="btn" data-metric="likes">Likes</button>
+        <button class="btn" data-metric="avg_watch_time" title="Segundos promedio de reproducción (manual)">⏱ Watch time</button>
+        <button class="btn" data-metric="skip_rate" title="% de personas que omitieron (menor = mejor)">⏭ % Omisiones</button>
+        <button class="btn" data-metric="new_followers" title="Nuevos seguidores generados por este post (manual)">👥 Nuevos seg.</button>
       </div>
       <span class="snapshot-info">📸 {num_snapshots} snapshots · desde {first_snapshot}</span>
     </div>
@@ -1247,15 +1252,15 @@ def build_html(perfil, insights, posts, demo, history):
   </div>
 
   <!-- INSIGHTS -->
-  <h2>¿Qué funciona mejor? <small style="font-size:.65rem;color:#555588;font-weight:400;text-transform:none;letter-spacing:0">— alcance promedio a las 48h por categoría</small></h2>
+  <h2>¿Qué funciona mejor? <small style="font-size:.65rem;color:#555588;font-weight:400;text-transform:none;letter-spacing:0">— alcance y métricas de Insights promedio por categoría</small></h2>
   <div class="insight-grid">
     <div class="insight-box">
-      <h3>Por formato</h3>
+      <h3>Por formato — alcance 48h</h3>
       <div id="insightFormat"><p style="color:#444466;font-size:.75rem">Cargando…</p></div>
-      <p class="insight-note">alcance 48h promedio · reach total entre paréntesis</p>
+      <p class="insight-note">alcance 48h promedio</p>
     </div>
     <div class="insight-box">
-      <h3>Por etapa del embudo</h3>
+      <h3>Por etapa del embudo — alcance 48h</h3>
       <div id="insightTag"><p style="color:#444466;font-size:.75rem">Cargando…</p></div>
       <p class="insight-note">etiqueta los posts en la tabla para ver este análisis</p>
     </div>
@@ -1264,6 +1269,28 @@ def build_html(perfil, insights, posts, demo, history):
       <div id="insightHour"><p style="color:#444466;font-size:.75rem">Cargando…</p></div>
       <p class="insight-note">mañana (&lt;12h) · tarde (12-18h) · noche (&gt;18h) hora Colombia</p>
     </div>
+    <div class="insight-box">
+      <h3>Watch time por etapa del embudo</h3>
+      <div id="insightWatchTime"><p style="color:#444466;font-size:.75rem">Sin datos aún — llena métricas en los posts para verlo</p></div>
+      <p class="insight-note">segundos promedio de reproducción · solo posts con métricas llenadas</p>
+    </div>
+    <div class="insight-box">
+      <h3>% Omisiones por etapa del embudo</h3>
+      <div id="insightSkipRate"><p style="color:#444466;font-size:.75rem">Sin datos aún — llena métricas en los posts para verlo</p></div>
+      <p class="insight-note">menor es mejor · solo posts con métricas llenadas</p>
+    </div>
+    <div class="insight-box">
+      <h3>Nuevos seguidores por etapa del embudo</h3>
+      <div id="insightNewFollowers"><p style="color:#444466;font-size:.75rem">Sin datos aún — llena métricas en los posts para verlo</p></div>
+      <p class="insight-note">promedio de nuevos seguidores por post · solo posts con métricas llenadas</p>
+    </div>
+  </div>
+
+  <!-- Cola de priorización -->
+  <div class="card" id="priorityQueueCard" style="margin-top:8px;border-color:#7c6fff40">
+    <h2 style="margin-top:0;color:#7c6fff">📋 Posts por medir en Instagram Insights</h2>
+    <p style="font-size:.75rem;color:#8888aa;margin-bottom:14px">Posts entre 36-72h de vida sin métricas manuales — ábrelos en Insights y llena los datos en el modal.</p>
+    <div id="priorityQueue"><p style="color:#444466;font-size:.8rem">Calculando…</p></div>
   </div>
 
   <h2>Últimos 30 posts <small style="color:#555588;font-size:.7rem;font-weight:400">— haz clic en cualquier fila para ver su historial · cambia el tipo de contenido con el selector</small></h2>
@@ -1306,6 +1333,40 @@ def build_html(perfil, insights, posts, demo, history):
     <p id="modalNoData" style="color:#555588;font-size:.8rem;text-align:center;padding:30px 0;display:none">
       Aún no hay suficientes snapshots para mostrar la curva de este post. Vuelve mañana. 📅
     </p>
+    <!-- Métricas manuales de Instagram Insights -->
+    <div id="modalInsightsSection" style="margin-top:22px;padding-top:18px;border-top:1px solid #2a2a44">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span style="font-size:.72rem;font-weight:700;color:#9090cc;text-transform:uppercase;letter-spacing:.06em">📊 Instagram Insights</span>
+        <span id="modalInsightsReadAt" style="font-size:.63rem;color:#444466"></span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px">
+        <div>
+          <label style="display:block;font-size:.65rem;color:#8888aa;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Tiempo prom. (s)</label>
+          <input type="number" step="0.1" id="modalWatchTime" class="lab-field"
+                 style="text-align:center;padding:8px;font-size:.88rem"
+                 placeholder="—">
+        </div>
+        <div>
+          <label style="display:block;font-size:.65rem;color:#8888aa;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">% Omisiones</label>
+          <input type="number" step="0.1" id="modalSkipRate" class="lab-field"
+                 style="text-align:center;padding:8px;font-size:.88rem"
+                 placeholder="—">
+        </div>
+        <div>
+          <label style="display:block;font-size:.65rem;color:#8888aa;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Nuevos seguidores</label>
+          <input type="number" step="1" id="modalNewFollowers" class="lab-field"
+                 style="text-align:center;padding:8px;font-size:.88rem"
+                 placeholder="—">
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <button onclick="saveModalInsights()" id="modalSaveInsightsBtn"
+                style="background:#5c6bc0;border:none;color:#fff;padding:7px 20px;border-radius:20px;cursor:pointer;font-size:.75rem;font-weight:600">
+          💾 Guardar métricas
+        </button>
+        <span id="modalInsightsSaved" style="font-size:.7rem;color:#43a047;display:none">✓ guardado</span>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1445,7 +1506,13 @@ const GROWTH_POSTS  = {growth_json};
 const COLORS        = {colors_json};
 const TAG_COLORS    = {tag_colors_json};
 const CATEGORIES    = {categories_json};
-const METRIC_LABELS = {{ reach_48h:"Alcance 48h", vida_util:"Vida útil (reach/h)", reach:"Alcance total", likes:"Likes" }};
+const METRIC_LABELS = {{
+  reach_48h:"Alcance 48h", vida_util:"Vida útil (reach/h)", reach:"Alcance total", likes:"Likes",
+  avg_watch_time:"Watch time (s)", skip_rate:"% Omisiones", new_followers:"Nuevos seguidores"
+}};
+
+// Métricas manuales de Insights — mutables (se actualizan al guardar sin reload)
+let _insights = {post_insights_json};
 
 let currentMetric = "reach_48h";
 let rankingChart  = null;
@@ -1464,8 +1531,9 @@ async function loadTagsFromServer() {{
     if (r.ok) {{
       const data = await r.json();
       const pinnedArr = data._pinned || [];
-      _pinned = new Set(pinnedArr);
-      _tags = Object.fromEntries(Object.entries(data).filter(([k]) => k !== "_pinned"));
+      _pinned   = new Set(pinnedArr);
+      _insights = Object.assign({{}}, data._insights || {{}});
+      _tags     = Object.fromEntries(Object.entries(data).filter(([k]) => k !== "_pinned" && k !== "_insights"));
     }}
   }} catch(_) {{}}
   mergeLocalTags(GROWTH_POSTS);
@@ -1474,6 +1542,7 @@ async function loadTagsFromServer() {{
   applyPinBtns();
   renderRanking();
   renderInsights();
+  renderPriorityQueue();
   if (window.renderClicksChart) window.renderClicksChart(window._clicksMetric || "clicks");
 }}
 
@@ -1483,16 +1552,28 @@ function shortCap(caption, len) {{
 }}
 
 function getVal(p, metric) {{
-  if (metric === "reach_48h")  return p.reach_48h || 0;
-  if (metric === "vida_util")  return p.vida_util || 0;
+  if (metric === "reach_48h")    return p.reach_48h || 0;
+  if (metric === "vida_util")    return p.vida_util || 0;
+  if (metric === "avg_watch_time" || metric === "skip_rate" || metric === "new_followers") {{
+    const ins = _insights[p.id] || {{}};
+    return ins[metric] != null ? ins[metric] : 0;
+  }}
   const last = p.series[p.series.length - 1] || {{}};
   return last[metric] || 0;
 }}
 
 function renderRanking() {{
+  const manualMetrics = ["avg_watch_time", "skip_rate", "new_followers"];
+  const isManual = manualMetrics.includes(currentMetric);
+  // Para métricas manuales, solo incluir posts que tengan ese dato llenado
   const ranked = [...GROWTH_POSTS]
     .filter(p => p.series && p.series.length > 0)
-    .sort((a, b) => getVal(b, currentMetric) - getVal(a, currentMetric));
+    .filter(p => !isManual || (_insights[p.id] && _insights[p.id][currentMetric] != null))
+    .sort((a, b) => {{
+      // skip_rate: menor es mejor → invertir orden
+      if (currentMetric === "skip_rate") return getVal(a, currentMetric) - getVal(b, currentMetric);
+      return getVal(b, currentMetric) - getVal(a, currentMetric);
+    }});
 
   const noData = ranked.length === 0;
   document.getElementById("noDataMsg").style.display    = noData ? "block" : "none";
@@ -1530,10 +1611,17 @@ function renderRanking() {{
             label: item => {{
               const p = ranked[item.dataIndex];
               const last = p.series[p.series.length-1] || {{}};
+              const ins = _insights[p.id] || {{}};
               if (currentMetric === "reach_48h")
                 return ` Alcance 48h: ${{item.parsed.x.toLocaleString("es-CO")}} · medido a ${{p.reach_48h_hours||"??"}}h`;
               if (currentMetric === "vida_util")
                 return ` Vida útil: ${{item.parsed.x.toFixed(1)}} reach/h · ${{Math.round(last.hours||0)}}h de vida`;
+              if (currentMetric === "skip_rate")
+                return ` Omisiones: ${{item.parsed.x}}% · reach 48h: ${{(p.reach_48h||0).toLocaleString("es-CO")}}`;
+              if (currentMetric === "avg_watch_time")
+                return ` Watch time: ${{item.parsed.x}}s · reach 48h: ${{(p.reach_48h||0).toLocaleString("es-CO")}}`;
+              if (currentMetric === "new_followers")
+                return ` Nuevos seg.: ${{item.parsed.x}} · reach 48h: ${{(p.reach_48h||0).toLocaleString("es-CO")}}`;
               return ` ${{METRIC_LABELS[currentMetric]}}: ${{item.parsed.x.toLocaleString("es-CO")}}`;
             }},
             afterLabel: item => {{
@@ -1733,11 +1821,105 @@ function renderInsights() {{
     .map(([label, d]) => ({{ label, val: avg(d.r48), reach: avg(d.reach), n: d.r48.length }}))
     .sort((a,b) => b.val - a.val);
   renderInsightGroup("insightHour", hourGroups, "reach 48h");
+
+  // Métricas manuales por etapa del embudo
+  function insightsByTagManual(field, higherIsBetter) {{
+    const byT = {{}};
+    ALL_POSTS_VU.forEach(p => {{
+      if (_pinned.has(p.id)) return;
+      const ins = _insights[p.id] || {{}};
+      if (ins[field] == null) return;
+      const t = (_tags[p.id] || p.tag || "sin etiquetar");
+      if (t === "sin etiquetar") return;
+      if (!byT[t]) byT[t] = [];
+      byT[t].push(ins[field]);
+    }});
+    return Object.entries(byT)
+      .map(([label, vals]) => ({{ label, val: avg(vals), n: vals.length }}))
+      .sort((a,b) => higherIsBetter ? b.val - a.val : a.val - b.val);
+  }}
+
+  const wtGroups = insightsByTagManual("avg_watch_time", true);
+  const srGroups = insightsByTagManual("skip_rate", false);
+  const nfGroups = insightsByTagManual("new_followers", true);
+
+  if (wtGroups.length) renderInsightGroup("insightWatchTime", wtGroups, "s");
+  if (srGroups.length) {{
+    // Para skip_rate la barra debe ser inversa: menor % = mejor
+    const maxSR = Math.max(...srGroups.map(g => g.val), 0.01);
+    const container = document.getElementById("insightSkipRate");
+    if (container) {{
+      container.innerHTML = srGroups.map(g => {{
+        const pct = Math.round((1 - g.val/maxSR) * 100); // invertido
+        const color = TAG_COLORS[g.label] || "#5c6bc0";
+        return `<div class="insight-row">
+          <span class="insight-label">${{g.label}}</span>
+          <div class="insight-bar-wrap"><div class="insight-bar" style="width:${{pct}}%;background:${{color}}"></div></div>
+          <span class="insight-val">${{g.val.toFixed(1)}} <span style="font-size:.6rem;color:#666">%</span></span>
+        </div>`;
+      }}).join("") + `<p style="font-size:.65rem;color:#444466;margin-top:8px">La barra más larga = menos omisiones = mejor</p>`;
+    }}
+  }}
+  if (nfGroups.length) renderInsightGroup("insightNewFollowers", nfGroups, "seg.");
 }}
 
 // Las etiquetas se cargan del servidor — renderInsights y renderRanking
 // se vuelven a llamar desde loadTagsFromServer() al completar
 loadTagsFromServer();
+
+// ── Cola de priorización ─────────────────────────────────────
+function renderPriorityQueue() {{
+  const now = Date.now();
+  const h36 = 36 * 3600000;
+  const h72 = 72 * 3600000;
+
+  // Posts entre 36-72h de vida sin métricas manuales llenadas
+  const queue = ALL_POSTS_VU
+    .filter(p => {{
+      if (!p.published_at) return false;
+      const pub = new Date(p.published_at.replace("+0000","Z")).getTime();
+      const age = now - pub;
+      if (age < h36 || age > h72) return false;
+      const ins = _insights[p.id] || {{}};
+      return ins.avg_watch_time == null || ins.skip_rate == null || ins.new_followers == null;
+    }})
+    .sort((a,b) => {{
+      const ageA = Math.abs(now - new Date(a.published_at.replace("+0000","Z")).getTime() - 48*3600000);
+      const ageB = Math.abs(now - new Date(b.published_at.replace("+0000","Z")).getTime() - 48*3600000);
+      return ageA - ageB; // más cercano a 48h primero
+    }});
+
+  const el = document.getElementById("priorityQueue");
+  if (!el) return;
+
+  if (!queue.length) {{
+    el.innerHTML = '<p style="font-size:.78rem;color:#43a047">✓ Todos los posts en ventana 36-72h ya tienen métricas llenadas.</p>';
+    return;
+  }}
+
+  el.innerHTML = queue.map(p => {{
+    const pub = new Date(p.published_at.replace("+0000","Z"));
+    const ageH = Math.round((now - pub.getTime()) / 3600000);
+    const ins = _insights[p.id] || {{}};
+    const missing = [
+      ins.avg_watch_time == null ? "watch time" : null,
+      ins.skip_rate      == null ? "% omisiones" : null,
+      ins.new_followers  == null ? "nuevos seg." : null
+    ].filter(Boolean).join(", ");
+    const tag = (_tags[p.id] || p.tag || "sin etiquetar");
+    const tagColor = TAG_COLORS[tag] || "#555577";
+    return `<div onclick="openModal('${{p.id}}')" style="display:flex;align-items:center;gap:12px;padding:10px 12px;`
+      + `background:rgba(124,111,255,.05);border:1px solid rgba(124,111,255,.15);border-radius:8px;margin-bottom:8px;cursor:pointer;transition:background .15s"
+         onmouseover="this.style.background='rgba(124,111,255,.1)'" onmouseout="this.style.background='rgba(124,111,255,.05)'">`
+      + `<span style="font-size:.75rem;font-weight:700;color:#7c6fff;min-width:36px">${{ageH}}h</span>`
+      + `<span style="flex:1;font-size:.77rem;color:#cccce0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${{shortCap(p.caption||p.published,55)}}</span>`
+      + `<span style="font-size:.65rem;color:${{tagColor}};white-space:nowrap">${{tag}}</span>`
+      + `<span style="font-size:.63rem;color:#555588;white-space:nowrap">falta: ${{missing}}</span>`
+      + `</div>`;
+  }}).join("");
+}}
+
+renderPriorityQueue();
 
 // ── Follower growth ──────────────────────────────────────────
 const FOLLOWER_SERIES = {follower_series_json};
@@ -1859,9 +2041,58 @@ function openModal(pid) {{
     b.classList.toggle("active", b.dataset.m === "vida_util");
   }});
 
+  // Cargar métricas manuales en los campos
+  const ins = _insights[pid] || {{}};
+  document.getElementById("modalWatchTime").value      = ins.avg_watch_time != null ? ins.avg_watch_time : "";
+  document.getElementById("modalSkipRate").value       = ins.skip_rate     != null ? ins.skip_rate     : "";
+  document.getElementById("modalNewFollowers").value   = ins.new_followers != null ? ins.new_followers : "";
+  document.getElementById("modalInsightsReadAt").textContent =
+    ins.read_at ? "Última lectura: " + ins.read_at.slice(0,16).replace("T"," ") : "";
+  document.getElementById("modalInsightsSaved").style.display = "none";
+  // Guardar el pid actual en el botón para la función save
+  document.getElementById("modalSaveInsightsBtn").dataset.pid = pid;
+
   document.getElementById("modalOverlay").classList.add("open");
   document.body.style.overflow = "hidden";
   renderModalChart();
+}}
+
+async function saveModalInsights() {{
+  const btn = document.getElementById("modalSaveInsightsBtn");
+  const pid = btn.dataset.pid;
+  if (!pid) return;
+
+  const wt  = document.getElementById("modalWatchTime").value.trim();
+  const sr  = document.getElementById("modalSkipRate").value.trim();
+  const nf  = document.getElementById("modalNewFollowers").value.trim();
+  const now = new Date().toISOString();
+
+  const insData = {{
+    avg_watch_time: wt  !== "" ? parseFloat(wt)  : null,
+    skip_rate:      sr  !== "" ? parseFloat(sr)  : null,
+    new_followers:  nf  !== "" ? parseInt(nf)    : null,
+    read_at:        now
+  }};
+
+  // Actualizar local inmediatamente (sin esperar server)
+  _insights[pid] = insData;
+  document.getElementById("modalInsightsReadAt").textContent = "Última lectura: " + now.slice(0,16).replace("T"," ");
+
+  try {{
+    const res = await fetch("/save-tags", {{
+      method: "POST",
+      headers: {{ "Content-Type": "application/json" }},
+      body: JSON.stringify({{ _insights: {{ [pid]: insData }} }})
+    }});
+    if (res.ok) {{
+      document.getElementById("modalInsightsSaved").style.display = "inline";
+      setTimeout(() => {{ document.getElementById("modalInsightsSaved").style.display = "none"; }}, 2500);
+      // Re-renderizar ranking e insights con datos nuevos
+      renderRanking();
+      renderInsights();
+      renderPriorityQueue();
+    }}
+  }} catch(e) {{ console.error("saveModalInsights:", e); }}
 }}
 
 function closeModal() {{
