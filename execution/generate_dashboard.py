@@ -669,68 +669,83 @@ def build_html(perfil, insights, posts, demo, history):
     lab_js = _LAB_JS.replace("__EXPS__", experiments_str).replace("__REACH__", lab_reach_str)
 
     # ── Sección: Conclusiones probadas ───────────────────────
-    conclusiones_html = ""
+    # ── Playbook: reglas cortas de experimentos cerrados válidos ──
+    PLAYBOOK_RULES = []
     for exp_id, exp in experiments.items():
-        if isinstance(exp, dict) and exp.get("status") == "cerrado" and exp.get("insight", "").strip():
-            insight = exp["insight"]
-            is_warn = insight.startswith("⚠️")
-            bg   = "rgba(251,140,0,.08)" if is_warn else "rgba(0,255,165,.06)"
-            bdr  = "#fb8c00" if is_warn else "#00ffa5"
-            icon = "⚠️" if is_warn else "✅"
-            conclusiones_html += (
-                f'<div style="background:{bg};border-left:3px solid {bdr};border-radius:8px;'
-                f'padding:14px 16px;margin-bottom:12px">'
-                f'<div style="font-size:.7rem;color:#8888aa;margin-bottom:4px">{icon} {exp.get("name","")}</div>'
-                f'<p style="margin:0;font-size:.82rem;color:#cccce0;line-height:1.55">{insight}</p>'
-                f'</div>'
-            )
-    if not conclusiones_html:
-        conclusiones_html = '<p style="color:#555588;font-size:.82rem">Aún no hay experimentos cerrados.</p>'
+        if not isinstance(exp, dict) or exp.get("status") != "cerrado":
+            continue
+        insight = exp.get("insight", "").strip()
+        if not insight or insight.startswith("⚠️"):
+            continue
+        # Extraer reglas del insight (frases separadas por —)
+        PLAYBOOK_RULES.append({
+            "title": exp.get("name", exp_id),
+            "rules": insight,
+            "source": exp_id.replace("_", " ").upper(),
+        })
 
-    # ── Sección: Experimentos por hacer ──────────────────────
-    PENDING_EXPERIMENTS = [
-        {
-            "name": "Cara vs sin cara — mismo concepto",
-            "why": "En exp_001 el hook ganador fue hablado a cámara. ¿Es Daniel en pantalla el factor, o solo el guión? Hacer el mismo reel con y sin cara para separar las variables.",
-            "tag": "hooks",
-        },
-        {
-            "name": "Hook de identidad vs hook de problema",
-            "why": "En exp_001 \"identificar a alguien con clase\" (identidad) superó a \"lo que los expertos notan\" (autoridad). Testear directamente: identidad aspiracional vs problema/miedo — cuál activa más curiosidad en audiencia nueva.",
-            "tag": "hooks",
-        },
-        {
-            "name": "Texto provocativo en carrusel",
-            "why": "El texto grande en pantalla fue clave en exp_001 para reels. ¿Funciona el mismo principio en carruseles? Primera slide con frase provocativa grande vs headline más suave — medir saves y alcance.",
-            "tag": "formato",
-        },
-        {
-            "name": "Reel corto (15s) vs largo (45s) — mismo hook",
-            "why": "No tenemos datos propios sobre duración óptima. Mismo concepto y hook, dos cortes distintos. Si el corto gana, optimizar todos los reels futuros; si el largo gana, la retención pesa más que la rapidez.",
-            "tag": "formato",
-        },
-        {
-            "name": "CTA de seguimiento al final vs sin CTA",
-            "why": "Probar si agregar \"sígueme para ver más\" al final de un reel de atracción aumenta followers ganados sin castigar reach — o si el algoritmo lo penaliza como contenido de baja calidad.",
-            "tag": "conversión",
-        },
-    ]
-    TAG_COLOR = {"hooks": "#7c6fff", "formato": "#00bcd4", "conversión": "#00ffa5"}
-    pendientes_html = ""
-    for p in PENDING_EXPERIMENTS:
-        color = TAG_COLOR.get(p["tag"], "#8888aa")
-        pendientes_html += (
-            f'<div style="background:rgba(255,255,255,.04);border-radius:8px;padding:14px 16px;margin-bottom:10px;'
-            f'display:flex;gap:12px;align-items:flex-start">'
-            f'<span style="font-size:1.1rem;margin-top:1px">🔬</span>'
-            f'<div style="flex:1">'
-            f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">'
-            f'<strong style="font-size:.85rem;color:#eeeeff">{p["name"]}</strong>'
-            f'<span style="font-size:.65rem;background:{color}22;color:{color};border-radius:4px;padding:2px 7px">{p["tag"]}</span>'
-            f'</div>'
-            f'<p style="margin:0;font-size:.78rem;color:#8888aa;line-height:1.5">{p["why"]}</p>'
-            f'</div></div>'
+    playbook_html = ""
+    for r in PLAYBOOK_RULES:
+        # Partir el insight en frases cortas en puntos separados por "."
+        sentences = [s.strip() for s in r["rules"].replace("✅", "").split(".") if s.strip() and len(s.strip()) > 10]
+        items_html = "".join(
+            f'<li style="margin-bottom:6px;color:#cccce0;font-size:.8rem;line-height:1.5">{s}.</li>'
+            for s in sentences
         )
+        playbook_html += (
+            f'<div style="background:rgba(0,255,165,.05);border-left:3px solid #00ffa5;border-radius:8px;'
+            f'padding:14px 16px;margin-bottom:12px">'
+            f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+            f'<strong style="font-size:.82rem;color:#eeeeff">{r["title"]}</strong>'
+            f'<span style="font-size:.65rem;background:#00ffa522;color:#00ffa5;border-radius:4px;padding:2px 7px">{r["source"]}</span>'
+            f'</div>'
+            f'<ul style="margin:0;padding-left:16px">{items_html}</ul>'
+            f'</div>'
+        )
+    if not playbook_html:
+        playbook_html = '<p style="color:#555588;font-size:.82rem">Aún no hay experimentos cerrados con resultados válidos.</p>'
+
+    # ── Árbol de decisión ────────────────────────────────────
+    decision_tree_html = """
+<div style="font-size:.8rem;line-height:1.6">
+  <p style="color:#8888aa;margin:0 0 14px">Antes de grabar variantes, responde estas preguntas:</p>
+
+  <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:14px 16px;margin-bottom:8px">
+    <strong style="color:#eeeeff">¿Los fotogramas del video son idénticos entre variantes?</strong>
+    <div style="margin-top:10px;padding-left:14px;border-left:2px solid #333355">
+      <div style="margin-bottom:8px">
+        <span style="color:#ff5555">→ Sí</span>
+        <span style="color:#8888aa"> (mismo clip, diferente texto/audio/música)</span><br>
+        <span style="background:rgba(255,85,85,.1);color:#ff8888;border-radius:6px;padding:4px 10px;display:inline-block;margin-top:4px;font-size:.75rem">
+          ❌ No uses Trial Reels — Instagram detecta el duplicado y suprime todas las variantes excepto la primera. No aprenderás nada del hook.
+        </span>
+      </div>
+      <div>
+        <span style="color:#00ffa5">→ No</span>
+        <span style="color:#8888aa"> (videos genuinamente distintos)</span><br>
+        <div style="margin-top:8px;padding-left:14px;border-left:2px solid #333355">
+          <strong style="color:#eeeeff">¿El hook cambia desde el segundo 1 en los fotogramas?</strong>
+          <div style="margin-top:8px;padding-left:14px;border-left:2px solid #333355">
+            <div style="margin-bottom:8px">
+              <span style="color:#00ffa5">→ Sí</span>
+              <span style="color:#8888aa"> (cara en cámara con guión diferente, o B-roll de apertura distinto)</span><br>
+              <span style="background:rgba(0,255,165,.08);color:#00ffa5;border-radius:6px;padding:4px 10px;display:inline-block;margin-top:4px;font-size:.75rem">
+                ✅ Puedes subirlos en ráfaga como Trial Reels — el fingerprint los trata como contenido distinto.
+              </span>
+            </div>
+            <div>
+              <span style="color:#fb8c00">→ No del todo</span>
+              <span style="color:#8888aa"> (mismo B-roll, diferente orden de clips o cortes sutiles)</span><br>
+              <span style="background:rgba(251,140,0,.08);color:#ffbb55;border-radius:6px;padding:4px 10px;display:inline-block;margin-top:4px;font-size:.75rem">
+                ⚠️ Zona de riesgo — el fingerprint puede o no detectarlo. Si el experimento importa, espera 24h entre variantes o usa B-roll diferente de apertura.
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>"""
 
     # Número de snapshots
     num_snapshots = len(history)
@@ -1132,29 +1147,37 @@ def build_html(perfil, insights, posts, demo, history):
 
   <!-- LAB TAB -->
   <div id="labContent" style="display:none">
-    <div style="margin:0 0 28px">
+    <div style="margin:0 0 24px">
       <h2 style="margin:0 0 6px;font-size:1.05rem;color:#fff;text-transform:none;letter-spacing:0">🧪 Laboratorio de experimentos</h2>
       <p style="font-size:.78rem;color:#8888aa;margin:0">Documenta qué cambió en cada variante · los datos los muestra el sistema · <strong style="color:#cccce0">juntos llegamos al insight</strong></p>
     </div>
 
-    <!-- Conclusiones probadas -->
-    <div style="margin-bottom:32px">
-      <h3 style="font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:#7c6fff;margin:0 0 14px;font-weight:700">📌 Lo que ya sabemos — conclusiones probadas</h3>
-      {conclusiones_html}
-    </div>
-
-    <!-- Experimentos por hacer -->
-    <div style="margin-bottom:32px">
-      <h3 style="font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:#fb8c00;margin:0 0 14px;font-weight:700">🎯 Lo que debemos probar</h3>
-      {pendientes_html}
-    </div>
-
-    <!-- Experimentos activos -->
-    <div>
-      <h3 style="font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:#8888aa;margin:0 0 14px;font-weight:700">🧪 Experimentos</h3>
-      <div id="labExperiments">
-        <p style="color:#555588;font-size:.82rem">Cargando…</p>
+    <!-- Playbook colapsible -->
+    <details style="margin-bottom:12px;background:rgba(0,255,165,.03);border:1px solid rgba(0,255,165,.12);border-radius:10px;padding:0">
+      <summary style="cursor:pointer;padding:14px 16px;font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#00ffa5;list-style:none;display:flex;justify-content:space-between;align-items:center">
+        📖 Playbook — lo que ya funciona
+        <span style="font-size:.7rem;color:#00ffa588;font-weight:400;text-transform:none;letter-spacing:0">▾ expandir</span>
+      </summary>
+      <div style="padding:4px 16px 16px">
+        {playbook_html}
       </div>
+    </details>
+
+    <!-- Árbol de decisión colapsible -->
+    <details style="margin-bottom:24px;background:rgba(124,111,255,.03);border:1px solid rgba(124,111,255,.15);border-radius:10px;padding:0">
+      <summary style="cursor:pointer;padding:14px 16px;font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#7c6fff;list-style:none;display:flex;justify-content:space-between;align-items:center">
+        🔀 ¿Puedo hacer este experimento con Trial Reels?
+        <span style="font-size:.7rem;color:#7c6fff88;font-weight:400;text-transform:none;letter-spacing:0">▾ expandir</span>
+      </summary>
+      <div style="padding:4px 16px 16px">
+        {decision_tree_html}
+      </div>
+    </details>
+
+    <!-- Experimentos -->
+    <h3 style="font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:#8888aa;margin:0 0 14px;font-weight:700">🧪 Experimentos</h3>
+    <div id="labExperiments">
+      <p style="color:#555588;font-size:.82rem">Cargando…</p>
     </div>
   </div>
 
