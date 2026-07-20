@@ -72,8 +72,9 @@
     },
     "18086488862121190": {
       "new_followers": null,
-      "read_at": "2026-07-20T23:22:31.611Z",
-      "avg_watch_time": 3
+      "read_at": "2026-07-20T23:22:34.478Z",
+      "avg_watch_time": 3,
+      "skip_rate": 67.8
     }
   }
 }
