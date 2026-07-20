@@ -963,9 +963,17 @@ def build_html(perfil, insights, posts, demo, history):
         pin_title   = "Fijado — excluido de insights" if is_pinned else "Marcar como fijado en el perfil"
         pin_cls     = " pin-active" if is_pinned else ""
         ins         = post_insights.get(pid, {})
+        is_video    = p.get("media_type", "") == "VIDEO"
         wt_val      = ins.get("avg_watch_time", "")
         sr_val      = ins.get("skip_rate", "")
         nf_val      = ins.get("new_followers", "")
+        # watch time y skip rate solo para videos
+        if is_video:
+            wt_cell = f'<input type="number" step="0.1" class="inline-insight-input" data-pid="{pid}" data-field="avg_watch_time" value="{wt_val}" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)">'
+            sr_cell = f'<input type="number" step="0.1" class="inline-insight-input" data-pid="{pid}" data-field="skip_rate" value="{sr_val}" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)">'
+        else:
+            wt_cell = '<span style="color:#333355;font-size:.7rem">n/a</span>'
+            sr_cell = '<span style="color:#333355;font-size:.7rem">n/a</span>'
         posts_rows += f"""
         <tr class="clickable" data-pid="{pid}" onclick="openModal(this.dataset.pid)">
           <td>{pub}<br><small style="color:#666">{days_old}d</small></td>
@@ -987,10 +995,8 @@ def build_html(perfil, insights, posts, demo, history):
           <td class="num">{p.get("metric_saved",0):,}</td>
           <td class="num">{p.get("metric_shares",0):,}</td>
           <td class="num">{eng}%</td>
-          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="{pid}" data-field="avg_watch_time"
-               value="{wt_val}" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
-          <td class="center"><input type="number" step="0.1" class="inline-insight-input" data-pid="{pid}" data-field="skip_rate"
-               value="{sr_val}" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
+          <td class="center">{wt_cell}</td>
+          <td class="center">{sr_cell}</td>
           <td class="center"><input type="number" step="1" class="inline-insight-input" data-pid="{pid}" data-field="new_followers"
                value="{nf_val}" placeholder="—" onclick="event.stopPropagation()" onblur="saveInlineInsight(this)"></td>
           <td class="center"><a href="{p.get("permalink","")}" target="_blank" onclick="event.stopPropagation()">↗</a></td>
@@ -2100,9 +2106,16 @@ function openModal(pid) {{
   }});
 
   // Cargar métricas manuales en los campos
-  const ins = _insights[pid] || {{}};
-  document.getElementById("modalWatchTime").value      = ins.avg_watch_time != null ? ins.avg_watch_time : "";
-  document.getElementById("modalSkipRate").value       = ins.skip_rate     != null ? ins.skip_rate     : "";
+  const ins     = _insights[pid] || {{}};
+  const isVideo = (POST_INDEX[pid] || {{}}).type === "VIDEO";
+  const wtInput = document.getElementById("modalWatchTime");
+  const srInput = document.getElementById("modalSkipRate");
+  wtInput.value    = ins.avg_watch_time != null ? ins.avg_watch_time : "";
+  srInput.value    = ins.skip_rate      != null ? ins.skip_rate      : "";
+  wtInput.disabled = !isVideo;
+  srInput.disabled = !isVideo;
+  wtInput.placeholder = isVideo ? "—" : "solo videos";
+  srInput.placeholder = isVideo ? "—" : "solo videos";
   document.getElementById("modalNewFollowers").value   = ins.new_followers != null ? ins.new_followers : "";
   document.getElementById("modalInsightsReadAt").textContent =
     ins.read_at ? "Última lectura: " + ins.read_at.slice(0,16).replace("T"," ") : "";
