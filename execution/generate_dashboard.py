@@ -1603,8 +1603,10 @@ function getVal(p, metric) {{
 function renderRanking() {{
   const manualMetrics = ["avg_watch_time", "skip_rate", "new_followers"];
   const isManual = manualMetrics.includes(currentMetric);
-  // Para métricas manuales, solo incluir posts que tengan ese dato llenado
-  const ranked = [...GROWTH_POSTS]
+  // Para métricas manuales usar ALL_POSTS_VU (incluye posts anteriores al primer snapshot)
+  // Para métricas de API usar GROWTH_POSTS (solo posts con historial de snapshots)
+  const sourcePool = isManual ? ALL_POSTS_VU : GROWTH_POSTS;
+  const ranked = [...sourcePool]
     .filter(p => p.series && p.series.length > 0)
     .filter(p => !isManual || (_insights[p.id] && _insights[p.id][currentMetric] != null))
     .sort((a, b) => {{
