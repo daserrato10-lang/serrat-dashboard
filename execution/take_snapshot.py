@@ -128,16 +128,27 @@ def gh_headers():
     }
 
 def gh_read_snapshots():
-    """Lee post_snapshots.json del repo. Devuelve (content_dict, sha)."""
+    """Lee post_snapshots.json del repo. Devuelve (content_dict, sha).
+    Si el archivo supera 1MB usa Git Blobs API (sin límite de tamaño)."""
+    # 1) Metadata via Contents API — siempre devuelve sha aunque el archivo sea >1MB
     url = f"{BASE_GH}/repos/{GH_REPO}/contents/{GH_SNAPSHOTS}"
     try:
-        res  = http_get(url, gh_headers())
-        raw  = base64.b64decode(res["content"]).decode("utf-8")
-        return json.loads(raw), res["sha"]
+        meta = http_get(url, gh_headers())
     except urllib.error.HTTPError as e:
         if e.code == 404:
-            return {}, None   # archivo no existe aún
+            return {}, None
         raise
+    blob_sha = meta.get("sha")
+    # 2) Contents API no devuelve content si >1MB (encoding="none") → usar Blobs API
+    if meta.get("encoding") == "none" or not meta.get("content"):
+        blob = http_get(
+            f"{BASE_GH}/repos/{GH_REPO}/git/blobs/{blob_sha}",
+            gh_headers()  # devuelve {"content": "<base64>", "encoding": "base64"}
+        )
+        raw = base64.b64decode(blob["content"]).decode("utf-8")
+    else:
+        raw = base64.b64decode(meta["content"]).decode("utf-8")
+    return json.loads(raw), blob_sha
 
 def gh_write_snapshots(history, sha, message):
     """Escribe post_snapshots.json en el repo via GitHub API."""

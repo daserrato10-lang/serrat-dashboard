@@ -2454,19 +2454,30 @@ window.switchClicksMetric = function(metric) {{
 # ── Main ──────────────────────────────────────────────────────
 
 def fetch_snapshots_from_github():
-    """Lee post_snapshots.json desde GitHub si no hay archivo local."""
+    """Lee post_snapshots.json desde GitHub si no hay archivo local.
+    Si el archivo supera 1MB usa Git Blobs API (Contents API falla sobre ese límite)."""
     import base64, urllib.error
     gh_token = cfg.get("GH_TOKEN", os.environ.get("GH_TOKEN", ""))
     gh_repo  = cfg.get("GH_REPO",  os.environ.get("GH_REPO", ""))
+    snap_path = cfg.get("GH_SNAPSHOTS_PATH", os.environ.get("GH_SNAPSHOTS_PATH", "data/post_snapshots.json"))
     if not gh_token or not gh_repo:
         return None
-    url = f"https://api.github.com/repos/{gh_repo}/contents/data/post_snapshots.json"
-    headers = {"Authorization": f"Bearer {gh_token}", "Accept": "application/vnd.github+json"}
-    try:
-        req = urllib.request.Request(url, headers=headers)
+    gh_headers = {"Authorization": f"Bearer {gh_token}", "Accept": "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28"}
+    def gh_get(url):
+        req = urllib.request.Request(url, headers=gh_headers)
         with urllib.request.urlopen(req, timeout=15) as r:
-            d = json.loads(r.read())
-        return json.loads(base64.b64decode(d["content"]))
+            return json.loads(r.read())
+    try:
+        meta = gh_get(f"https://api.github.com/repos/{gh_repo}/contents/{snap_path}")
+        blob_sha = meta.get("sha")
+        if meta.get("encoding") == "none" or not meta.get("content"):
+            # Archivo >1MB: usar Blobs API
+            blob = gh_get(f"https://api.github.com/repos/{gh_repo}/git/blobs/{blob_sha}")
+            raw = base64.b64decode(blob["content"]).decode("utf-8")
+        else:
+            raw = base64.b64decode(meta["content"]).decode("utf-8")
+        return json.loads(raw)
     except Exception as e:
         print(f"  ⚠️  No se pudo leer de GitHub: {e}")
         return None
