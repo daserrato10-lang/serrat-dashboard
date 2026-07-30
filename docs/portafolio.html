@@ -1,3 +1,8 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Daniel Serrato — Growth & Producto, construido con datos reales</title>
 <style>
   :root{
@@ -37,6 +42,7 @@
   ::selection{background:var(--ink); color:var(--bg);}
 
   .shell{max-width:920px; margin:0 auto; padding:0 32px;}
+  @media (max-width:640px){ .shell{padding:0 20px;} section{padding:44px 0;} }
 
   /* ---- Nav ---- */
   nav{
@@ -172,6 +178,8 @@
   .reveal.in{opacity:1; transform:none;}
   @media (prefers-reduced-motion:reduce){ .reveal{opacity:1; transform:none; transition:none;} }
 </style>
+</head>
+<body>
 
 <nav>
   <div class="nav-inner">
@@ -348,3 +356,5 @@
     els.forEach(function(el){ el.classList.add('in'); });
   }
 </script>
+</body>
+</html>
