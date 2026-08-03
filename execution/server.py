@@ -27,10 +27,18 @@ def gh_headers():
     }
 
 def gh_read(path):
+    # Archivos >1MB: Contents API devuelve encoding="none" y sin content -> usar Blobs API
     url = f"{BASE_GH}/repos/{GH_REPO}/contents/{path}"
     req = urllib.request.Request(url, headers=gh_headers())
     with urllib.request.urlopen(req, timeout=15) as r:
         data = json.loads(r.read())
+    if data.get("encoding") == "none" or not data.get("content"):
+        blob_req = urllib.request.Request(
+            f"{BASE_GH}/repos/{GH_REPO}/git/blobs/{data['sha']}", headers=gh_headers()
+        )
+        with urllib.request.urlopen(blob_req, timeout=20) as r:
+            blob = json.loads(r.read())
+        return base64.b64decode(blob["content"]).decode("utf-8"), data["sha"]
     return base64.b64decode(data["content"]).decode("utf-8"), data["sha"]
 
 def gh_write(path, content_str, sha, message):
